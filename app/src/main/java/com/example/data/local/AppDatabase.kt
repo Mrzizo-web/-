@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.example.data.local.dao.*
 import com.example.data.local.entity.*
+import com.example.data.local.migration.MIGRATION_1_2
 
 @Database(
     entities = [
@@ -36,7 +37,7 @@ import com.example.data.local.entity.*
         AuditLogEntity::class,
         CafeteriaSettingEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -71,7 +72,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "power_feul_pos.db"
                 )
-                    .fallbackToDestructiveMigration(true)
+                    .addMigrations(MIGRATION_1_2)
                     .build()
                 INSTANCE = instance
                 instance

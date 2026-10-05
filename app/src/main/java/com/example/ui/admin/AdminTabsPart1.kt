@@ -353,7 +353,8 @@ fun AdminProductsTab(
     categories: List<CategoryEntity>,
     onAddProduct: (name: String, catId: String, price: Double) -> Unit,
     onUpdateProductPrice: (productId: String, newPrice: Double) -> Unit,
-    onToggleProductAvailable: (productId: String, isAvailable: Boolean) -> Unit
+    onToggleProductAvailable: (productId: String, isAvailable: Boolean) -> Unit,
+    canViewCosts: Boolean = true
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     var editPriceProduct by remember { mutableStateOf<ProductEntity?>(null) }

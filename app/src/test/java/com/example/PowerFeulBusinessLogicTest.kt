@@ -8,6 +8,7 @@ import com.example.data.local.AppDatabase
 import com.example.data.local.entity.*
 import com.example.data.seed.DatabaseSeeder
 import com.example.domain.model.*
+import com.example.security.PasswordHasher
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -122,11 +123,13 @@ class PowerFeulBusinessLogicTest {
 
     @Test
     fun testShiftLifecycle() = runBlocking {
+        val hash = PasswordHasher.DEFAULT.hash("1234")
         val testUser = UserEntity(
             id = "cashier-1",
             name = "محمد سليم",
             username = "mohamed",
-            pin = "1234",
+            pinHash = hash.hashHex,
+            pinSalt = hash.saltHex,
             role = UserRole.CASHIER
         )
         db.userDao().insertUser(testUser)
@@ -186,11 +189,13 @@ class PowerFeulBusinessLogicTest {
         assertEquals(1900.0, closedShift.leftForNextShiftCash, 0.01)
 
         // 5. Next Cashier Accepts Handover
+        val hash2 = PasswordHasher.DEFAULT.hash("5678")
         val nextUser = UserEntity(
             id = "cashier-2",
             name = "عمر خالد",
             username = "omar",
-            pin = "5678",
+            pinHash = hash2.hashHex,
+            pinSalt = hash2.saltHex,
             role = UserRole.CASHIER
         )
         db.userDao().insertUser(nextUser)
@@ -209,11 +214,13 @@ class PowerFeulBusinessLogicTest {
 
     @Test
     fun testSalesEngineAndInventoryDeduction() = runBlocking {
+        val hash = PasswordHasher.DEFAULT.hash("1234")
         val testUser = UserEntity(
             id = "user-1",
             name = "محمد",
             username = "mohamed",
-            pin = "1234",
+            pinHash = hash.hashHex,
+            pinSalt = hash.saltHex,
             role = UserRole.CASHIER
         )
         db.userDao().insertUser(testUser)
@@ -287,11 +294,21 @@ class PowerFeulBusinessLogicTest {
         val updatedBanana = db.rawMaterialDao().getRawMaterialById("mat-banana")!!
         assertEquals(9.6, updatedBanana.currentStock, 0.001)
 
-        // Test Voiding Sale: Restores Inventory back to 10.0 KG
+        // Test Voiding Sale: Restores Inventory back to 10.0 KG (authorized by supervisor)
+        val supervisor = UserEntity(
+            id = "sup-1",
+            name = "المشرف",
+            username = "supervisor",
+            pinHash = hash.hashHex,
+            pinSalt = hash.saltHex,
+            role = UserRole.SUPERVISOR
+        )
+        db.userDao().insertUser(supervisor)
+
         val voidResult = salesEngine.voidSale(
             saleId = sale.id,
             reason = "طلب العميل إلغاء الفاتورة",
-            user = testUser
+            user = supervisor
         )
         assertTrue(voidResult.isSuccess)
         val restoredBanana = db.rawMaterialDao().getRawMaterialById("mat-banana")!!
@@ -300,11 +317,13 @@ class PowerFeulBusinessLogicTest {
 
     @Test
     fun testDebtSaleAndCreditLimitEnforcement() = runBlocking {
+        val hash = PasswordHasher.DEFAULT.hash("1234")
         val testUser = UserEntity(
             id = "user-1",
             name = "محمد",
             username = "mohamed",
-            pin = "1234",
+            pinHash = hash.hashHex,
+            pinSalt = hash.saltHex,
             role = UserRole.CASHIER
         )
         db.userDao().insertUser(testUser)

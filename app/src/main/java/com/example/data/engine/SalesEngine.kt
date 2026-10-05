@@ -6,6 +6,8 @@ import com.example.data.local.entity.*
 import com.example.domain.model.CustomerStatus
 import com.example.domain.model.PaymentMethod
 import com.example.domain.model.ShiftStatus
+import com.example.security.AppPermission
+import com.example.security.PermissionChecker
 import java.util.Locale
 import java.util.UUID
 
@@ -236,6 +238,10 @@ class SalesEngine(
         reason: String,
         user: UserEntity
     ): Result<SaleEntity> {
+        if (!PermissionChecker.hasPermission(user, AppPermission.VOID_SALE)) {
+            return Result.failure(SecurityException("المستخدم غير مصرح له بإلغاء واسترجاع الفواتير"))
+        }
+
         val sale = saleDao.getSaleById(saleId) ?: return Result.failure(Exception("الفاتورة غير موجودة"))
         if (sale.status == "VOIDED") {
             return Result.failure(Exception("الفاتورة ملغاة بالفعل مسبقاً"))

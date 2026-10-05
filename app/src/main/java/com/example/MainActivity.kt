@@ -13,11 +13,14 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.AppScreen
 import com.example.ui.MainViewModel
 import com.example.ui.admin.AdminMainScreen
 import com.example.ui.auth.LoginScreen
+import com.example.ui.auth.SessionLockDialog
 import com.example.ui.pos.PaymentDialog
 import com.example.ui.pos.PosScreen
 import com.example.ui.pos.ReceiptDialog
@@ -51,17 +54,41 @@ class MainActivity : ComponentActivity() {
                     snackbarHost = { SnackbarHost(snackbarHostState) },
                     modifier = Modifier.fillMaxSize()
                 ) { innerPadding ->
-                    Box(modifier = Modifier.padding(innerPadding)) {
+                    val isSessionLocked by viewModel.isSessionLocked.collectAsStateWithLifecycle()
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding)
+                            .pointerInput(Unit) {
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        awaitPointerEvent(PointerEventPass.Initial)
+                                        viewModel.onUserActivity()
+                                    }
+                                }
+                            }
+                    ) {
                         if (currentUser == null) {
-                            val users by viewModel.users.collectAsStateWithLifecycle()
+                            val userProfiles by viewModel.userProfiles.collectAsStateWithLifecycle()
                             val loginError by viewModel.loginErrorMessage.collectAsStateWithLifecycle()
                             LoginScreen(
-                                users = users,
-                                onLoginSuccess = { user -> viewModel.login(user) },
+                                userProfiles = userProfiles,
+                                onAuthenticate = { userId, pin -> viewModel.authenticate(userId, pin) },
                                 errorMessage = loginError,
                                 onClearError = { viewModel.loginErrorMessage.value = null }
                             )
                         } else {
+                            if (isSessionLocked) {
+                                val loginError by viewModel.loginErrorMessage.collectAsStateWithLifecycle()
+                                SessionLockDialog(
+                                    currentUser = currentUser!!,
+                                    onUnlock = { pin -> viewModel.unlockSession(pin) },
+                                    onLogout = { viewModel.logout() },
+                                    errorMessage = loginError
+                                )
+                            }
+
                             val loggedInUser = currentUser!!
                             when (activeScreen) {
                                 AppScreen.POS -> {

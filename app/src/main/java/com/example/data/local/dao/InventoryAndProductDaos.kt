@@ -15,8 +15,17 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE id = :id LIMIT 1")
     suspend fun getUserById(id: String): UserEntity?
 
-    @Query("SELECT * FROM users WHERE pin = :pin AND isActive = 1 LIMIT 1")
-    suspend fun getUserByPin(pin: String): UserEntity?
+    @Query("SELECT * FROM users WHERE username = :username LIMIT 1")
+    suspend fun getUserByUsername(username: String): UserEntity?
+
+    @Query("SELECT COUNT(*) FROM users")
+    suspend fun countUsers(): Int
+
+    @Query("SELECT COUNT(*) FROM users WHERE role = 'OWNER' AND isActive = 1")
+    suspend fun countActiveOwners(): Int
+
+    @Query("SELECT COUNT(*) FROM users WHERE role IN ('OWNER', 'ADMIN') AND isActive = 1")
+    suspend fun countActiveAdminsAndOwners(): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUser(user: UserEntity)
@@ -24,11 +33,23 @@ interface UserDao {
     @Update
     suspend fun updateUser(user: UserEntity)
 
-    @Query("UPDATE users SET isActive = 0 WHERE id = :id")
-    suspend fun deactivateUser(id: String)
+    @Query("UPDATE users SET isActive = 0, updatedAt = :now WHERE id = :id")
+    suspend fun deactivateUser(id: String, now: Long = System.currentTimeMillis())
 
-    @Query("UPDATE users SET isActive = :isActive WHERE id = :id")
-    suspend fun setUserActiveStatus(id: String, isActive: Boolean)
+    @Query("UPDATE users SET isActive = :isActive, updatedAt = :now WHERE id = :id")
+    suspend fun setUserActiveStatus(id: String, isActive: Boolean, now: Long = System.currentTimeMillis())
+
+    @Query("UPDATE users SET failedAttempts = :attempts, lockedUntil = :lockedUntil, updatedAt = :now WHERE id = :id")
+    suspend fun updateFailedAttempts(id: String, attempts: Int, lockedUntil: Long?, now: Long = System.currentTimeMillis())
+
+    @Query("UPDATE users SET failedAttempts = 0, lockedUntil = NULL, lastLoginAt = :now, updatedAt = :now WHERE id = :id")
+    suspend fun recordSuccessfulLogin(id: String, now: Long = System.currentTimeMillis())
+
+    @Query("UPDATE users SET pinHash = :pinHash, pinSalt = :pinSalt, failedAttempts = 0, lockedUntil = NULL, updatedAt = :now WHERE id = :id")
+    suspend fun updatePin(id: String, pinHash: String, pinSalt: String, now: Long = System.currentTimeMillis())
+
+    @Query("UPDATE users SET failedAttempts = 0, lockedUntil = NULL, updatedAt = :now WHERE id = :id")
+    suspend fun unlockUser(id: String, now: Long = System.currentTimeMillis())
 }
 
 @Dao

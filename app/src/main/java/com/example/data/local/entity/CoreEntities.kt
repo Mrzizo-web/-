@@ -11,11 +11,16 @@ data class UserEntity(
     val id: String = UUID.randomUUID().toString(),
     val name: String,
     val username: String,
-    val pin: String, // 4-6 digit secure PIN
+    val pinHash: String,
+    val pinSalt: String,
     val role: UserRole,
     val phone: String = "",
     val isActive: Boolean = true,
-    val createdAt: Long = System.currentTimeMillis()
+    val failedAttempts: Int = 0,
+    val lockedUntil: Long? = null,
+    val lastLoginAt: Long? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 @Entity(tableName = "categories")

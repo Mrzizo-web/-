@@ -9,9 +9,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
+import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockClock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,37 +25,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.local.entity.UserEntity
+import com.example.domain.model.UserProfile
 import com.example.ui.theme.PowerOrange
 import com.example.ui.theme.PowerOrangeDark
+import com.example.ui.theme.StatusDanger
 
 @Composable
 fun LoginScreen(
-    users: List<UserEntity>,
-    onLoginSuccess: (UserEntity) -> Unit,
+    userProfiles: List<UserProfile>,
+    onAuthenticate: (userId: String, pin: String) -> Unit,
     errorMessage: String?,
     onClearError: () -> Unit
 ) {
     var enteredPin by remember { mutableStateOf("") }
-    var selectedUser by remember { mutableStateOf<UserEntity?>(null) }
+    var selectedUser by remember { mutableStateOf<UserProfile?>(null) }
     var localError by remember { mutableStateOf<String?>(null) }
+    var isAuthenticating by remember { mutableStateOf(false) }
 
-    LaunchedEffect(enteredPin) {
-        if (enteredPin.length == 4) {
-            val user = if (selectedUser != null && selectedUser?.pin == enteredPin) {
-                selectedUser
-            } else {
-                users.firstOrNull { it.pin == enteredPin }
-            }
-
-            if (user != null) {
-                localError = null
-                onLoginSuccess(user)
-            } else {
-                localError = "رمز PIN غير صحيح، يرجى المحاولة مرة أخرى"
-                enteredPin = ""
-            }
-        }
+    LaunchedEffect(enteredPin, selectedUser, errorMessage) {
+        isAuthenticating = false
     }
 
     Box(
@@ -116,7 +106,7 @@ fun LoginScreen(
 
                 // Fast user switcher row
                 Text(
-                    text = "اختر المستخدم أو أدخل رمز PIN مباشرة:",
+                    text = "اختر حساب الموظف للمتابعة:",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -126,19 +116,31 @@ fun LoginScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(horizontal = 8.dp)
                 ) {
-                    items(users) { user ->
+                    items(userProfiles) { user ->
                         val isSelected = selectedUser?.id == user.id
                         FilterChip(
                             selected = isSelected,
                             onClick = {
                                 selectedUser = if (isSelected) null else user
+                                enteredPin = ""
                                 onClearError()
                                 localError = null
                             },
                             label = {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(user.name, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                    Text("(${user.role.titleAr})", fontSize = 11.sp, color = PowerOrange)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("(${user.role.titleAr})", fontSize = 11.sp, color = PowerOrange)
+                                        if (user.isLocked) {
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Icon(
+                                                imageVector = Icons.Default.LockClock,
+                                                contentDescription = "مقفل",
+                                                tint = StatusDanger,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             },
                             leadingIcon = if (isSelected) {
@@ -154,16 +156,42 @@ fun LoginScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // PIN Display Dots
+                // Locked alert for selected user
+                if (selectedUser?.isLocked == true) {
+                    Surface(
+                        color = StatusDanger.copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.LockClock, contentDescription = null, tint = StatusDanger)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "الحساب مقفل مؤقتاً لتكرار المحاولات الخاطئة. يرجى الانتظار (${selectedUser!!.lockRemainingSeconds} ثانية).",
+                                color = StatusDanger,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
+                // PIN Display Dots (4 to 6 digits)
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    for (i in 0 until 4) {
+                    val maxDots = 6
+                    for (i in 0 until maxDots) {
                         val isFilled = i < enteredPin.length
                         Box(
                             modifier = Modifier
-                                .size(20.dp)
+                                .size(18.dp)
                                 .clip(CircleShape)
                                 .background(
                                     if (isFilled) PowerOrange
@@ -186,7 +214,7 @@ fun LoginScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 // Numeric Keypad
                 Column(
@@ -222,7 +250,7 @@ fun LoginScreen(
                                                 onClearError()
                                             }
                                             else -> {
-                                                if (enteredPin.length < 4) {
+                                                if (enteredPin.length < 6) {
                                                     enteredPin += key
                                                     localError = null
                                                     onClearError()
@@ -236,14 +264,45 @@ fun LoginScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                // Quick Hint for Testing
-                Text(
-                    text = "💡 تجربة سريعة: المالك 1111 • المدير 2222 • كاشير أحمد 1234 • كاشير سعيد 5678",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                    textAlign = TextAlign.Center
-                )
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Explicit Login Button
+                val isLoginReady = selectedUser != null && enteredPin.length >= 4 && selectedUser?.isLocked != true && !isAuthenticating
+                Button(
+                    onClick = {
+                        if (selectedUser == null) {
+                            localError = "يرجى تحديد حساب الموظف أولاً"
+                        } else if (enteredPin.length < 4) {
+                            localError = "رمز PIN يجب أن يتكون من 4 إلى 6 أرقام"
+                        } else if (!isAuthenticating) {
+                            isAuthenticating = true
+                            localError = null
+                            val userId = selectedUser!!.id
+                            val pin = enteredPin
+                            enteredPin = ""
+                            onAuthenticate(userId, pin)
+                        }
+                    },
+                    enabled = isLoginReady,
+                    colors = ButtonDefaults.buttonColors(containerColor = PowerOrange),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .testTag("login_submit_button")
+                ) {
+                    if (isAuthenticating) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.5.dp
+                        )
+                    } else {
+                        Icon(Icons.AutoMirrored.Filled.Login, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("تسجيل الدخول", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                }
             }
         }
     }
@@ -257,7 +316,7 @@ fun KeypadButton(
     val isAction = text == "C" || text == "DEL"
     Surface(
         modifier = Modifier
-            .size(width = 80.dp, height = 56.dp)
+            .size(width = 80.dp, height = 54.dp)
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
             .testTag("keypad_$text"),

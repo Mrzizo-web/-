@@ -5,61 +5,77 @@ import com.example.data.local.AppDatabase
 import com.example.data.local.entity.*
 import com.example.domain.model.CustomerStatus
 import com.example.domain.model.UserRole
+import com.example.security.PasswordHasher
 import java.util.UUID
 
 object DatabaseSeeder {
     suspend fun seedIfEmpty(db: AppDatabase) {
         val userDao = db.userDao()
-        val existing = userDao.getUserByPin("1111")
-        if (existing != null) return // Already seeded
+        val userCount = userDao.countUsers()
+        if (userCount > 0) return // Already seeded
 
         db.withTransaction {
+            val hasher = PasswordHasher.DEFAULT
+
+            val ownerHash = hasher.hash("1111")
+            val adminHash = hasher.hash("2222")
+            val supervisorHash = hasher.hash("3333")
+            val ahmedHash = hasher.hash("1234")
+            val saeedHash = hasher.hash("5678")
+            val inventoryHash = hasher.hash("4444")
+
             // 1. Users
-        val users = listOf(
-            UserEntity(
-                name = "زياد الشامي (مالك النادي)",
-                username = "owner",
-                pin = "1111",
-                role = UserRole.OWNER,
-                phone = "777000111"
-            ),
-            UserEntity(
-                name = "الكابتن صالح (المدير العام)",
-                username = "admin",
-                pin = "2222",
-                role = UserRole.ADMIN,
-                phone = "777000222"
-            ),
-            UserEntity(
-                name = "محمد اليافعي (المشرف)",
-                username = "supervisor",
-                pin = "3333",
-                role = UserRole.SUPERVISOR,
-                phone = "777000333"
-            ),
-            UserEntity(
-                name = "أحمد مسعود (كاشير)",
-                username = "ahmed",
-                pin = "1234",
-                role = UserRole.CASHIER,
-                phone = "777000444"
-            ),
-            UserEntity(
-                name = "سعيد باوزير (كاشير)",
-                username = "saeed",
-                pin = "5678",
-                role = UserRole.CASHIER,
-                phone = "777000555"
-            ),
-            UserEntity(
-                name = "عمر باحكيم (مسؤول المخزون)",
-                username = "inventory",
-                pin = "4444",
-                role = UserRole.INVENTORY_MANAGER,
-                phone = "777000666"
+            val users = listOf(
+                UserEntity(
+                    name = "زياد الشامي (مالك النادي)",
+                    username = "owner",
+                    pinHash = ownerHash.hashHex,
+                    pinSalt = ownerHash.saltHex,
+                    role = UserRole.OWNER,
+                    phone = "777000111"
+                ),
+                UserEntity(
+                    name = "الكابتن صالح (المدير العام)",
+                    username = "admin",
+                    pinHash = adminHash.hashHex,
+                    pinSalt = adminHash.saltHex,
+                    role = UserRole.ADMIN,
+                    phone = "777000222"
+                ),
+                UserEntity(
+                    name = "محمد اليافعي (المشرف)",
+                    username = "supervisor",
+                    pinHash = supervisorHash.hashHex,
+                    pinSalt = supervisorHash.saltHex,
+                    role = UserRole.SUPERVISOR,
+                    phone = "777000333"
+                ),
+                UserEntity(
+                    name = "أحمد مسعود (كاشير)",
+                    username = "ahmed",
+                    pinHash = ahmedHash.hashHex,
+                    pinSalt = ahmedHash.saltHex,
+                    role = UserRole.CASHIER,
+                    phone = "777000444"
+                ),
+                UserEntity(
+                    name = "سعيد باوزير (كاشير)",
+                    username = "saeed",
+                    pinHash = saeedHash.hashHex,
+                    pinSalt = saeedHash.saltHex,
+                    role = UserRole.CASHIER,
+                    phone = "777000555"
+                ),
+                UserEntity(
+                    name = "عمر باحكيم (مسؤول المخزون)",
+                    username = "inventory",
+                    pinHash = inventoryHash.hashHex,
+                    pinSalt = inventoryHash.saltHex,
+                    role = UserRole.INVENTORY_MANAGER,
+                    phone = "777000666"
+                )
             )
-        )
-        for (u in users) userDao.insertUser(u)
+            for (u in users) userDao.insertUser(u)
 
         // 2. Categories
         val categoryDao = db.categoryDao()

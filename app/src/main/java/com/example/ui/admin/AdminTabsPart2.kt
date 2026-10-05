@@ -737,7 +737,7 @@ fun AdminEmployeesTab(
                                     Text(u.role.titleAr, fontSize = 11.sp, color = PowerOrange, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                                 }
                             }
-                            Text("اسم المستخدم: @${u.username} • رمز PIN: ${u.pin} • هاتف: ${u.phone.ifEmpty { "غير مسجل" }}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("اسم المستخدم: @${u.username} • هاتف: ${u.phone.ifEmpty { "غير مسجل" }} • رمز PIN: محمي ومشفّر", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1281,7 +1281,7 @@ fun AdminSettingsTab(users: List<UserEntity>) {
                 Text("الموظفون المعتمدون (${users.size} موظف):", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 Spacer(modifier = Modifier.height(8.dp))
                 users.forEach { u ->
-                    Text("• ${u.name} — الدور: ${u.role.titleAr} (رمز PIN: ${u.pin})", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("• ${u.name} — الدور: ${u.role.titleAr}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

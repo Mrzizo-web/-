@@ -1,5 +1,8 @@
 package com.example.domain.model
 
+import com.example.security.AppPermission
+import com.example.security.PermissionChecker
+
 enum class UserRole(val titleAr: String) {
     OWNER("المالك"),
     ADMIN("المدير"),
@@ -8,28 +11,28 @@ enum class UserRole(val titleAr: String) {
     INVENTORY_MANAGER("مسؤول المخزون");
 
     val canAccessAdmin: Boolean
-        get() = this in listOf(OWNER, ADMIN, SUPERVISOR, INVENTORY_MANAGER)
+        get() = PermissionChecker.hasPermission(this, AppPermission.ACCESS_ADMIN)
 
     val canViewCosts: Boolean
-        get() = this in listOf(OWNER, ADMIN)
+        get() = PermissionChecker.hasPermission(this, AppPermission.VIEW_COSTS)
 
     val canViewRecipes: Boolean
-        get() = this in listOf(OWNER, ADMIN, SUPERVISOR)
+        get() = PermissionChecker.hasPermission(this, AppPermission.MANAGE_RECIPES)
 
     val canManageInventory: Boolean
-        get() = this in listOf(OWNER, ADMIN, INVENTORY_MANAGER)
+        get() = PermissionChecker.hasPermission(this, AppPermission.MANAGE_INVENTORY)
 
     val canManageEmployees: Boolean
-        get() = this in listOf(OWNER, ADMIN)
+        get() = PermissionChecker.hasPermission(this, AppPermission.MANAGE_EMPLOYEES)
 
     val canViewReports: Boolean
-        get() = this in listOf(OWNER, ADMIN, SUPERVISOR)
+        get() = PermissionChecker.hasPermission(this, AppPermission.VIEW_REPORTS)
 
     val canOverrideCreditLimit: Boolean
-        get() = this in listOf(OWNER, ADMIN)
+        get() = PermissionChecker.hasPermission(this, AppPermission.OVERRIDE_CREDIT)
 
     val canVoidSales: Boolean
-        get() = this in listOf(OWNER, ADMIN, SUPERVISOR)
+        get() = PermissionChecker.hasPermission(this, AppPermission.VOID_SALE)
 }
 
 enum class PaymentMethod(val titleAr: String) {

@@ -22,24 +22,26 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.entity.*
 import com.example.domain.model.UserRole
+import com.example.security.AppPermission
+import com.example.security.PermissionChecker
 import com.example.ui.theme.PowerOrange
 import com.example.ui.theme.PowerOrangeDark
 
-enum class AdminTab(val titleAr: String, val icon: ImageVector) {
-    DASHBOARD("الرئيسية", Icons.Default.Dashboard),
-    SALES("المبيعات", Icons.Default.PointOfSale),
-    PRODUCTS("المنتجات", Icons.Default.Inventory2),
-    RECIPES("الوصفات والخلطات", Icons.Default.RestaurantMenu),
-    INVENTORY("المخزون والمواد", Icons.Default.Warehouse),
-    PURCHASES("المشتريات والتوريد", Icons.Default.ShoppingBag),
-    DEBTS("العملاء والديون", Icons.Default.CreditCard),
-    EMPLOYEES("الموظفون", Icons.Default.People),
-    SHIFTS("الشفتات والنقدية", Icons.Default.AccountBalanceWallet),
-    EXPENSES("المصروفات", Icons.Default.MoneyOff),
-    REPORTS("التقارير والأرباح", Icons.Default.BarChart),
-    AUDIT_LOG("سجل العمليات", Icons.Default.History),
-    POWER_AI("مساعد POWER AI", Icons.Default.SmartToy),
-    SETTINGS("الإعدادات", Icons.Default.Settings)
+enum class AdminTab(val titleAr: String, val icon: ImageVector, val requiredPermission: AppPermission) {
+    DASHBOARD("الرئيسية", Icons.Default.Dashboard, AppPermission.ACCESS_ADMIN),
+    SALES("المبيعات", Icons.Default.PointOfSale, AppPermission.ACCESS_ADMIN),
+    PRODUCTS("المنتجات", Icons.Default.Inventory2, AppPermission.MANAGE_PRODUCTS),
+    RECIPES("الوصفات والخلطات", Icons.Default.RestaurantMenu, AppPermission.MANAGE_RECIPES),
+    INVENTORY("المخزون والمواد", Icons.Default.Warehouse, AppPermission.MANAGE_INVENTORY),
+    PURCHASES("المشتريات والتوريد", Icons.Default.ShoppingBag, AppPermission.MANAGE_INVENTORY),
+    DEBTS("العملاء والديون", Icons.Default.CreditCard, AppPermission.MANAGE_CUSTOMERS),
+    EMPLOYEES("الموظفون", Icons.Default.People, AppPermission.MANAGE_EMPLOYEES),
+    SHIFTS("الشفتات والنقدية", Icons.Default.AccountBalanceWallet, AppPermission.VIEW_REPORTS),
+    EXPENSES("المصروفات", Icons.Default.MoneyOff, AppPermission.VIEW_REPORTS),
+    REPORTS("التقارير والأرباح", Icons.Default.BarChart, AppPermission.VIEW_REPORTS),
+    AUDIT_LOG("سجل العمليات", Icons.Default.History, AppPermission.VIEW_AUDIT_LOGS),
+    POWER_AI("مساعد POWER AI", Icons.Default.SmartToy, AppPermission.ACCESS_ADMIN),
+    SETTINGS("الإعدادات", Icons.Default.Settings, AppPermission.MANAGE_SETTINGS)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -114,7 +116,13 @@ fun AdminMainScreen(
         return
     }
 
-    var selectedTab by remember { mutableStateOf(AdminTab.DASHBOARD) }
+    val availableTabs = remember(currentUser.role) {
+        AdminTab.values().filter { PermissionChecker.hasPermission(currentUser.role, it.requiredPermission) }
+    }
+
+    var selectedTab by remember(currentUser.role) {
+        mutableStateOf(availableTabs.firstOrNull() ?: AdminTab.DASHBOARD)
+    }
 
     Scaffold(
         topBar = {
@@ -175,7 +183,7 @@ fun AdminMainScreen(
                         .padding(vertical = 8.dp, horizontal = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(AdminTab.values()) { tab ->
+                    items(availableTabs) { tab ->
                         val isSelected = selectedTab == tab
                         Surface(
                             modifier = Modifier

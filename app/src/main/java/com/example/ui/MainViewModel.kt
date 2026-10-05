@@ -11,11 +11,18 @@ import com.example.domain.model.CustomerStatus
 import com.example.domain.model.InventoryTxType
 import com.example.domain.model.PaymentMethod
 import com.example.domain.model.ShiftStatus
+import com.example.domain.model.UserProfile
 import com.example.domain.model.UserRole
 import com.example.domain.model.WasteReason
+import com.example.security.AppPermission
+import com.example.security.LockoutPolicy
+import com.example.security.PasswordHasher
+import com.example.security.PermissionChecker
+import com.example.security.SessionManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 enum class AppScreen {
@@ -23,8 +30,33 @@ enum class AppScreen {
     ADMIN
 }
 
+sealed class AuthResult {
+    data class Success(val user: UserEntity) : AuthResult()
+    data class Failure(val message: String, val remainingAttempts: Int? = null) : AuthResult()
+    data class AccountLocked(val remainingSeconds: Long) : AuthResult()
+}
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     val db = AppDatabase.getInstance(application)
+
+    val passwordHasher = PasswordHasher.DEFAULT
+    val lockoutPolicy = LockoutPolicy()
+    val sessionManager = SessionManager(viewModelScope)
+    val isSessionLocked = sessionManager.isSessionLocked
+
+    fun onUserActivity() {
+        sessionManager.onUserActivity()
+    }
+
+    fun unlockSession(pin: String, onComplete: (AuthResult) -> Unit = {}) {
+        val user = _currentUser.value ?: return
+        authenticate(user.id, pin) { result ->
+            if (result is AuthResult.Success) {
+                sessionManager.unlockSession()
+            }
+            onComplete(result)
+        }
+    }
 
     private val costEngine = CostEngine(db.rawMaterialDao(), db.mixtureDao(), db.recipeDao())
     private val inventoryEngine = InventoryEngine(db.rawMaterialDao(), db.recipeDao(), db.mixtureDao(), db.inventoryTransactionDao())
@@ -54,6 +86,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val cartItems = _cartItems.asStateFlow()
 
     // Data Flows from Room
+    val userProfiles: StateFlow<List<UserProfile>> = db.userDao().getAllActiveUsers()
+        .map { list ->
+            val now = System.currentTimeMillis()
+            list.map { u ->
+                UserProfile(
+                    id = u.id,
+                    name = u.name,
+                    username = u.username,
+                    role = u.role,
+                    phone = u.phone,
+                    isActive = u.isActive,
+                    isLocked = lockoutPolicy.isLocked(u.lockedUntil, now),
+                    lockRemainingSeconds = lockoutPolicy.remainingLockTimeSeconds(u.lockedUntil, now),
+                    lastLoginAt = u.lastLoginAt
+                )
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val users = db.userDao().getAllActiveUsers().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val allUsers = db.userDao().getAllUsers().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val categories = db.categoryDao().getActiveCategories().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -77,13 +128,110 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun login(user: UserEntity) {
-        _currentUser.value = user
-        loginErrorMessage.value = null
-        _activeScreen.value = AppScreen.POS
-        _cartItems.value = emptyList()
-
+    fun authenticate(userId: String, rawPin: String, onResult: (AuthResult) -> Unit = {}) {
         viewModelScope.launch(Dispatchers.IO) {
+            val now = System.currentTimeMillis()
+            val user = db.userDao().getUserById(userId)
+            if (user == null) {
+                val res = AuthResult.Failure("المستخدم المحدد غير موجود في النظام")
+                loginErrorMessage.value = res.message
+                withContext(Dispatchers.Main) { onResult(res) }
+                return@launch
+            }
+
+            if (!user.isActive) {
+                val res = AuthResult.Failure("تم تعطيل هذا الحساب، يرجى مراجعة إدارة الكافتيريا")
+                loginErrorMessage.value = res.message
+                withContext(Dispatchers.Main) { onResult(res) }
+                return@launch
+            }
+
+            if (lockoutPolicy.isLocked(user.lockedUntil, now)) {
+                val remainingSec = lockoutPolicy.remainingLockTimeSeconds(user.lockedUntil, now)
+                val res = AuthResult.AccountLocked(remainingSec)
+                loginErrorMessage.value = "الحساب مقفل مؤقتاً لتكرار المحاولات الخاطئة. المتبقي: $remainingSec ثانية"
+                db.auditLogDao().insertLog(
+                    AuditLogEntity(
+                        userId = user.id,
+                        userName = user.name,
+                        userRole = user.role.titleAr,
+                        action = "LOGIN_FAILED",
+                        entityType = "USER",
+                        entityId = user.username,
+                        notes = "محاولة تسجيل دخول إلى حساب مقفل مؤقتاً"
+                    )
+                )
+                withContext(Dispatchers.Main) { onResult(res) }
+                return@launch
+            }
+
+            val isValid = passwordHasher.verify(rawPin, user.pinHash, user.pinSalt)
+            if (!isValid) {
+                val newAttempts = user.failedAttempts + 1
+                val lockUntil = lockoutPolicy.calculateLockout(newAttempts, now)
+                db.userDao().updateFailedAttempts(user.id, newAttempts, lockUntil, now)
+
+                val action = if (lockUntil != null) "ACCOUNT_LOCKED" else "LOGIN_FAILED"
+                val notes = if (lockUntil != null) {
+                    "تم قفل الحساب مؤقتاً لمدة ${lockoutPolicy.lockDurationMillis / 60000} دقائق بعد $newAttempts محاولات فاشلة متتالية"
+                } else {
+                    "محاولة دخول فاشلة برمز PIN خاطئ (المحاولة $newAttempts من ${lockoutPolicy.maxFailedAttempts})"
+                }
+
+                db.auditLogDao().insertLog(
+                    AuditLogEntity(
+                        userId = user.id,
+                        userName = user.name,
+                        userRole = user.role.titleAr,
+                        action = action,
+                        entityType = "USER",
+                        entityId = user.username,
+                        notes = notes
+                    )
+                )
+
+                val res = if (lockUntil != null) {
+                    val remainingSec = lockoutPolicy.remainingLockTimeSeconds(lockUntil, now)
+                    val msg = "تم تجاوز الحد الأقصى للمحاولات الخاطئة. أُقفل الحساب لمدة $remainingSec ثانية."
+                    loginErrorMessage.value = msg
+                    AuthResult.AccountLocked(remainingSec)
+                } else {
+                    val remaining = (lockoutPolicy.maxFailedAttempts - newAttempts).coerceAtLeast(0)
+                    val msg = "رمز PIN غير صحيح. المحاولات المتبقية: $remaining"
+                    loginErrorMessage.value = msg
+                    AuthResult.Failure(msg, remaining)
+                }
+
+                withContext(Dispatchers.Main) { onResult(res) }
+                return@launch
+            }
+
+            // Authentication Successful
+            db.userDao().recordSuccessfulLogin(user.id, now)
+            db.auditLogDao().insertLog(
+                AuditLogEntity(
+                    userId = user.id,
+                    userName = user.name,
+                    userRole = user.role.titleAr,
+                    action = "LOGIN_SUCCESS",
+                    entityType = "USER",
+                    entityId = user.username,
+                    notes = "تسجيل دخول ناجح إلى النظام"
+                )
+            )
+
+            val updatedUser = user.copy(
+                failedAttempts = 0,
+                lockedUntil = null,
+                lastLoginAt = now,
+                updatedAt = now
+            )
+
+            _currentUser.value = updatedUser
+            loginErrorMessage.value = null
+            _activeScreen.value = AppScreen.POS
+            sessionManager.unlockSession()
+
             // Check shift state
             val open = db.shiftDao().getCurrentOpenShiftSync()
             if (open == null) {
@@ -95,18 +243,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
-            // Log Login in Audit
-            db.auditLogDao().insertLog(
-                AuditLogEntity(
-                    userId = user.id,
-                    userName = user.name,
-                    userRole = user.role.titleAr,
-                    action = "LOGIN",
-                    entityType = "USER",
-                    entityId = user.username,
-                    notes = "تسجيل دخول ناجح إلى النظام"
-                )
-            )
+            withContext(Dispatchers.Main) { onResult(AuthResult.Success(updatedUser)) }
         }
     }
 
@@ -130,9 +267,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _currentUser.value = null
         _cartItems.value = emptyList()
         _activeScreen.value = AppScreen.POS
+        sessionManager.unlockSession()
+    }
+
+    private suspend fun logUnauthorizedAttempt(user: UserEntity, permission: AppPermission, operationName: String) {
+        db.auditLogDao().insertLog(
+            AuditLogEntity(
+                userId = user.id,
+                userName = user.name,
+                userRole = user.role.titleAr,
+                action = "UNAUTHORIZED_ACCESS_ATTEMPT",
+                entityType = "PERMISSION",
+                entityId = permission.name,
+                notes = "محاولة غير مصرح بها لتنفيذ: $operationName (الصلاحية المطلوبة: ${permission.titleAr})"
+            )
+        )
+        snackbarMessage.value = "غير مصرح لك بهذه العملية (${permission.titleAr})"
     }
 
     fun navigateTo(screen: AppScreen) {
+        val user = _currentUser.value
+        if (screen == AppScreen.ADMIN && !PermissionChecker.hasPermission(user, AppPermission.ACCESS_ADMIN)) {
+            if (user != null) {
+                viewModelScope.launch(Dispatchers.IO) {
+                    logUnauthorizedAttempt(user, AppPermission.ACCESS_ADMIN, "دخول لوحة الإدارة")
+                }
+            }
+            snackbarMessage.value = "غير مصرح لك بالوصول إلى لوحة الإدارة"
+            return
+        }
         _activeScreen.value = screen
     }
 
@@ -266,6 +429,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun addProduct(name: String, catId: String, price: Double) {
         val user = _currentUser.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
+            if (!PermissionChecker.hasPermission(user, AppPermission.MANAGE_PRODUCTS)) {
+                logUnauthorizedAttempt(user, AppPermission.MANAGE_PRODUCTS, "إضافة منتج $name")
+                return@launch
+            }
             val prod = ProductEntity(
                 name = name,
                 categoryId = catId,
@@ -293,6 +460,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun updateProductPrice(productId: String, newPrice: Double) {
         val user = _currentUser.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
+            if (!PermissionChecker.hasPermission(user, AppPermission.MANAGE_PRODUCTS)) {
+                logUnauthorizedAttempt(user, AppPermission.MANAGE_PRODUCTS, "تعديل سعر المنتج")
+                return@launch
+            }
             val prod = db.productDao().getProductById(productId) ?: return@launch
             val oldPrice = prod.price
             db.productDao().updateProduct(prod.copy(price = newPrice))
@@ -314,7 +485,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleProductAvailable(productId: String, isAvailable: Boolean) {
+        val user = _currentUser.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
+            if (!PermissionChecker.hasPermission(user, AppPermission.MANAGE_PRODUCTS)) {
+                logUnauthorizedAttempt(user, AppPermission.MANAGE_PRODUCTS, "تعديل حالة توفر المنتج")
+                return@launch
+            }
             db.productDao().updateAvailability(productId, isAvailable)
         }
     }
@@ -322,6 +498,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun addRawMaterial(name: String, sku: String, baseUnit: String, minStock: Double, price: Double) {
         val user = _currentUser.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
+            if (!PermissionChecker.hasPermission(user, AppPermission.MANAGE_INVENTORY)) {
+                logUnauthorizedAttempt(user, AppPermission.MANAGE_INVENTORY, "إضافة مادة خام $name")
+                return@launch
+            }
             val material = RawMaterialEntity(
                 name = name,
                 sku = sku.ifEmpty { "RM-${System.currentTimeMillis() % 1000}" },
@@ -351,6 +531,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun addCustomer(name: String, phone: String, creditLimit: Double, allowDebt: Boolean) {
         val user = _currentUser.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
+            if (!PermissionChecker.hasPermission(user, AppPermission.MANAGE_CUSTOMERS)) {
+                logUnauthorizedAttempt(user, AppPermission.MANAGE_CUSTOMERS, "إضافة عميل جديد $name")
+                return@launch
+            }
             val cust = CustomerEntity(
                 name = name,
                 phone = phone,
@@ -379,15 +563,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun addEmployee(name: String, username: String, pin: String, role: UserRole, phone: String) {
         val user = _currentUser.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
-            val existing = db.userDao().getUserByPin(pin)
-            if (existing != null) {
-                snackbarMessage.value = "رمز PIN مستخدم بالفعل لموظف آخر"
+            if (!PermissionChecker.hasPermission(user, AppPermission.MANAGE_EMPLOYEES)) {
+                logUnauthorizedAttempt(user, AppPermission.MANAGE_EMPLOYEES, "إضافة موظف جديد $name")
                 return@launch
             }
+            val existing = db.userDao().getUserByUsername(username)
+            if (existing != null) {
+                snackbarMessage.value = "اسم المستخدم @$username مستخدم بالفعل"
+                return@launch
+            }
+            val hashResult = passwordHasher.hash(pin)
             val newUser = UserEntity(
                 name = name,
                 username = username,
-                pin = pin,
+                pinHash = hashResult.hashHex,
+                pinSalt = hashResult.saltHex,
                 role = role,
                 phone = phone
             )
@@ -401,7 +591,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     entityType = "USER",
                     entityId = username,
                     newValue = role.titleAr,
-                    notes = "إضافة موظف جديد: $name بدرو ${role.titleAr}"
+                    notes = "إضافة موظف جديد: $name بدور ${role.titleAr}"
                 )
             )
             snackbarMessage.value = "تم إضافة الموظف بنجاح"
@@ -409,9 +599,105 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleUserActive(userId: String, isActive: Boolean) {
+        val user = _currentUser.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
+            if (!PermissionChecker.hasPermission(user, AppPermission.MANAGE_EMPLOYEES)) {
+                logUnauthorizedAttempt(user, AppPermission.MANAGE_EMPLOYEES, "تعديل حالة حساب موظف")
+                return@launch
+            }
+
+            val targetUser = db.userDao().getUserById(userId) ?: return@launch
+            if (!isActive) {
+                // Protect last OWNER
+                if (targetUser.role == UserRole.OWNER) {
+                    val activeOwners = db.userDao().countActiveOwners()
+                    if (activeOwners <= 1) {
+                        snackbarMessage.value = "لا يمكن تعطيل مالك النظام الوحيد النشط حالياً"
+                        return@launch
+                    }
+                }
+
+                // Protect self-deactivation if last active admin/owner
+                if (userId == user.id && (targetUser.role == UserRole.OWNER || targetUser.role == UserRole.ADMIN)) {
+                    val activeAdmins = db.userDao().countActiveAdminsAndOwners()
+                    if (activeAdmins <= 1) {
+                        snackbarMessage.value = "لا يمكن تعطيل حسابك لأنه آخر حساب إداري نشط في النظام"
+                        return@launch
+                    }
+                }
+            }
+
             db.userDao().setUserActiveStatus(userId, isActive)
+            val action = if (isActive) "USER_ENABLED" else "USER_DISABLED"
+            val stateText = if (isActive) "تفعيل" else "تعطيل"
+            db.auditLogDao().insertLog(
+                AuditLogEntity(
+                    userId = user.id,
+                    userName = user.name,
+                    userRole = user.role.titleAr,
+                    action = action,
+                    entityType = "USER",
+                    entityId = targetUser.username,
+                    notes = "$stateText حساب الموظف: ${targetUser.name} (@${targetUser.username})"
+                )
+            )
             snackbarMessage.value = if (isActive) "تم تفعيل حساب الموظف" else "تم تعطيل حساب الموظف"
+        }
+    }
+
+    fun changeUserPin(
+        userId: String,
+        currentPin: String?,
+        newPin: String,
+        onResult: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        val user = _currentUser.value ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val targetUser = db.userDao().getUserById(userId)
+            if (targetUser == null) {
+                withContext(Dispatchers.Main) { onResult(false, "المستخدم غير موجود") }
+                return@launch
+            }
+
+            val isSelf = user.id == userId
+            if (!isSelf && !PermissionChecker.hasPermission(user, AppPermission.MANAGE_EMPLOYEES)) {
+                logUnauthorizedAttempt(user, AppPermission.MANAGE_EMPLOYEES, "تغيير رمز PIN لموظف آخر")
+                withContext(Dispatchers.Main) { onResult(false, "غير مصرح لك بتغيير رمز PIN لهذا الموظف") }
+                return@launch
+            }
+
+            // If changing own PIN, verify current PIN
+            if (isSelf) {
+                if (currentPin.isNullOrBlank() || !passwordHasher.verify(currentPin, targetUser.pinHash, targetUser.pinSalt)) {
+                    withContext(Dispatchers.Main) { onResult(false, "رمز PIN الحالي غير صحيح") }
+                    return@launch
+                }
+            }
+
+            if (newPin.length !in 4..6 || !newPin.all { it.isDigit() }) {
+                withContext(Dispatchers.Main) { onResult(false, "رمز PIN الجديد يجب أن يتكون من 4 إلى 6 أرقام") }
+                return@launch
+            }
+
+            val newHash = passwordHasher.hash(newPin)
+            db.userDao().updatePin(userId, newHash.hashHex, newHash.saltHex)
+
+            db.auditLogDao().insertLog(
+                AuditLogEntity(
+                    userId = user.id,
+                    userName = user.name,
+                    userRole = user.role.titleAr,
+                    action = "PIN_CHANGED",
+                    entityType = "USER",
+                    entityId = targetUser.username,
+                    notes = "تم تحديث رمز PIN للمستخدم ${targetUser.name} بنجاح"
+                )
+            )
+
+            withContext(Dispatchers.Main) {
+                snackbarMessage.value = "تم تغيير رمز PIN بنجاح"
+                onResult(true, "تم تغيير رمز PIN بنجاح")
+            }
         }
     }
 
@@ -472,6 +758,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun createPurchase(supplierId: String, supplierName: String, invoiceNo: String, materialId: String, qty: Double, unit: String, unitPrice: Double) {
         val user = _currentUser.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
+            if (!PermissionChecker.hasPermission(user, AppPermission.MANAGE_INVENTORY)) {
+                logUnauthorizedAttempt(user, AppPermission.MANAGE_INVENTORY, "تسجيل أمر شراء وتوريد")
+                return@launch
+            }
             purchaseEngine.createPurchase(
                 user = user,
                 supplierId = supplierId,
@@ -486,6 +776,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun recordDebtPayment(customerId: String, amount: Double, isCash: Boolean, notes: String) {
         val user = _currentUser.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
+            if (!PermissionChecker.hasPermission(user, AppPermission.MANAGE_DEBTS)) {
+                logUnauthorizedAttempt(user, AppPermission.MANAGE_DEBTS, "تسجيل سند سداد دين")
+                return@launch
+            }
             val cust = db.customerDao().getCustomerById(customerId) ?: return@launch
             val newDebt = (cust.currentDebt - amount).coerceAtLeast(0.0)
             db.customerDao().updateDebt(customerId, newDebt, CustomerStatus.ACTIVE)
@@ -523,6 +817,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun recordWaste(materialId: String, qty: Double, unit: String, reason: String, notes: String) {
         val user = _currentUser.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
+            if (!PermissionChecker.hasPermission(user, AppPermission.ADJUST_STOCK)) {
+                logUnauthorizedAttempt(user, AppPermission.ADJUST_STOCK, "تسجيل هدر وتالف")
+                return@launch
+            }
             val mat = db.rawMaterialDao().getRawMaterialById(materialId) ?: return@launch
             inventoryEngine.deductRawMaterial(
                 materialId = materialId,
@@ -554,6 +852,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun applyStockAdjustment(materialId: String, actualStock: Double, reason: String) {
         val user = _currentUser.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
+            if (!PermissionChecker.hasPermission(user, AppPermission.ADJUST_STOCK)) {
+                logUnauthorizedAttempt(user, AppPermission.ADJUST_STOCK, "تسوية جردية للمخزون")
+                return@launch
+            }
             val mat = db.rawMaterialDao().getRawMaterialById(materialId) ?: return@launch
             val diff = actualStock - mat.currentStock
             db.rawMaterialDao().updateStock(materialId, actualStock)
@@ -578,6 +880,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun voidSale(saleId: String, reason: String) {
         val user = _currentUser.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
+            if (!PermissionChecker.hasPermission(user, AppPermission.VOID_SALE)) {
+                logUnauthorizedAttempt(user, AppPermission.VOID_SALE, "إلغاء واسترجاع الفاتورة $saleId")
+                return@launch
+            }
             val result = salesEngine.voidSale(saleId, reason, user)
             result.onSuccess {
                 snackbarMessage.value = "تم إلغاء الفاتورة ${it.invoiceNumber} وإرجاع المخزون وتسوية الحسابات بنجاح"
