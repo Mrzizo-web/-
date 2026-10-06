@@ -128,7 +128,8 @@ class DataImportEngine(
 
     private data class TableSchema(
         val columns: List<String>,
-        val pkColumns: List<String>
+        val pkColumns: List<String>,
+        val requiredColumns: List<String>
     )
 
     private data class ImportedRow(
@@ -269,6 +270,7 @@ class DataImportEngine(
     ): TableSchema {
         val columns = mutableListOf<String>()
         val pkPairs = mutableListOf<Pair<Int, String>>()
+        val required = mutableListOf<String>()
 
         db.query("PRAGMA table_info(" + quote(table) + ")").use { cursor ->
             val nameIndex = cursor.getColumnIndex("name")
@@ -280,6 +282,13 @@ class DataImportEngine(
                     if (pkIndex >= 0 && cursor.getInt(pkIndex) > 0) {
                         pkPairs += cursor.getInt(pkIndex) to name
                     }
+                    val notNullIndex = cursor.getColumnIndex("notnull")
+                    val defaultIndex = cursor.getColumnIndex("dflt_value")
+                    val requiredBySchema =
+                        notNullIndex >= 0 &&
+                            cursor.getInt(notNullIndex) == 1 &&
+                            (defaultIndex < 0 || cursor.isNull(defaultIndex))
+                    if (requiredBySchema) required += name
                 }
             }
         }
@@ -287,7 +296,8 @@ class DataImportEngine(
         require(columns.isNotEmpty()) { "الجدول غير موجود في قاعدة البيانات: " + table }
         return TableSchema(
             columns = columns,
-            pkColumns = pkPairs.sortedBy { it.first }.map { it.second }
+            pkColumns = pkPairs.sortedBy { it.first }.map { it.second },
+            requiredColumns = required
         )
     }
 
@@ -317,8 +327,14 @@ class DataImportEngine(
         require(row.values.size == row.columns.size) {
             "عدد القيم غير صحيح في " + table
         }
+        val values = row.asMap()
+        schema.requiredColumns.forEach { column ->
+            require(values[column].orEmpty().isNotBlank()) {
+                "العمود الإلزامي " + column + " مفقود في " + table
+            }
+        }
         if (schema.pkColumns.isNotEmpty()) {
-            require(pkKey(row.asMap(), schema.pkColumns) != null) {
+            require(pkKey(values, schema.pkColumns) != null) {
                 "المفتاح الأساسي مفقود في " + table
             }
         }
