@@ -233,7 +233,22 @@ fun AdminMainScreen(
                     AdminTab.DASHBOARD -> AdminDashboardTab(sales, rawMaterials, customers, shifts)
                     AdminTab.SALES -> AdminSalesTab(sales, onVoidSale, currentUser.role)
                     AdminTab.PRODUCTS -> AdminProductsTab(products, categories, onAddProduct, onUpdateProductPrice, onToggleProductAvailable)
-                    AdminTab.RECIPES -> AdminRecipesTab(recipes, products, rawMaterials, mixtures, PermissionChecker.hasPermission(currentUser.role, AppPermission.VIEW_COSTS))
+                    AdminTab.RECIPES -> AdminRecipesTab(
+                        recipes = recipes,
+                        products = products,
+                        rawMaterials = rawMaterials,
+                        mixtures = mixtures,
+                        canViewCosts = PermissionChecker.hasPermission(currentUser.role, AppPermission.VIEW_COSTS),
+                        onCreateRecipe = onCreateRecipe,
+                        onUpdateRecipe = onUpdateRecipe,
+                        onToggleRecipeActive = onToggleRecipeActive,
+                        onDeleteRecipe = onDeleteRecipe,
+                        onCreateMixture = onCreateMixture,
+                        onUpdateMixture = onUpdateMixture,
+                        onDeleteMixture = onDeleteMixture,
+                        onLoadRecipeItems = onLoadRecipeItems,
+                        onLoadMixtureItems = onLoadMixtureItems
+                    )
                     AdminTab.INVENTORY -> AdminInventoryTab(rawMaterials, onAddRawMaterial, onRecordWaste, onApplyStockAdjustment)
                     AdminTab.PURCHASES -> AdminPurchasesTab(purchases, suppliers, rawMaterials, onCreatePurchase)
                     AdminTab.DEBTS -> AdminDebtsTab(customers, onAddCustomer, onRecordDebtPayment)
@@ -243,7 +258,7 @@ fun AdminMainScreen(
                     AdminTab.REPORTS -> AdminReportsTab(sales, products, rawMaterials)
                     AdminTab.AUDIT_LOG -> AdminAuditLogTab(auditLogs)
                     AdminTab.POWER_AI -> AdminPowerAiTab(onAskAi)
-                    AdminTab.SETTINGS -> AdminSettingsTab(users, onExportDatabase, onRestoreDatabase)
+                    AdminTab.SETTINGS -> AdminSettingsTab(users, onExportDatabase, onExportCsvZip, onExportXlsx, onRestoreDatabase)
                 }
             }
         }
