@@ -60,10 +60,13 @@ object DatabaseBackupManager {
             val integrityOk = database.rawQuery("PRAGMA integrity_check", null).use { cursor ->
                 cursor.moveToFirst() && cursor.getString(0).equals("ok", ignoreCase = true)
             }
+            val schemaVersion = database.rawQuery("PRAGMA user_version", null).use { cursor ->
+                cursor.moveToFirst() && cursor.getInt(0) == 2
+            }
             val isPowerFeulBackup = database.rawQuery(
                 "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'users'", null
             ).use { it.moveToFirst() }
-            integrityOk && isPowerFeulBackup
+            integrityOk && schemaVersion && isPowerFeulBackup
         }
     }.getOrDefault(false)
 }

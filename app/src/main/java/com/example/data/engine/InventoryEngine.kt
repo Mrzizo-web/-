@@ -38,7 +38,7 @@ class InventoryEngine(
                     userId = userId,
                     userName = userName,
                     txType = InventoryTxType.SALE_CONSUMPTION,
-                    note = "استهلاك بيع فاتورة #$saleId"
+                    note = "استهلاك بيع فاتورة #$saleId • المنتج=$productId • الوصفة=${recipe.id}"
                 )
             } else if (!item.mixtureId.isNullOrEmpty()) {
                 // Expand mixture ingredients
@@ -57,7 +57,7 @@ class InventoryEngine(
                         userId = userId,
                         userName = userName,
                         txType = InventoryTxType.SALE_CONSUMPTION,
-                        note = "استهلاك خلطة (${item.name}) فاتورة #$saleId"
+                        note = "استهلاك خلطة (${item.name}) • المنتج=$productId • الوصفة=${recipe.id} • فاتورة #$saleId"
                     )
                 }
             }
@@ -123,10 +123,15 @@ class InventoryEngine(
         txType: InventoryTxType,
         note: String
     ) {
-        val material = rawMaterialDao.getRawMaterialById(materialId) ?: return
+        val material = rawMaterialDao.getRawMaterialById(materialId)
+            ?: throw IllegalStateException("مادة المخزون غير موجودة: $materialId")
         val convertedAmount = UnitConverter.convert(amount, unit, material.baseUnit)
+        require(convertedAmount >= 0.0) { "كمية الخصم لا يمكن أن تكون سالبة" }
         val prevStock = material.currentStock
-        val newStock = (prevStock - convertedAmount).coerceAtLeast(0.0)
+        require(prevStock + 1e-9 >= convertedAmount) {
+            "المخزون غير كافٍ للمادة ${material.name}: المطلوب $convertedAmount ${material.baseUnit} والمتوفر $prevStock ${material.baseUnit}"
+        }
+        val newStock = prevStock - convertedAmount
 
         rawMaterialDao.updateStock(materialId, newStock)
 
