@@ -24,14 +24,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.data.local.entity.UserEntity
+import com.example.domain.model.UserProfile
 import com.example.ui.theme.PowerOrange
 import com.example.ui.theme.PowerOrangeDark
 import com.example.ui.theme.StatusDanger
 
 @Composable
 fun SessionLockDialog(
-    currentUser: UserEntity,
+    currentUser: UserProfile,
     onUnlock: (pin: String) -> Unit,
     onLogout: () -> Unit,
     errorMessage: String?

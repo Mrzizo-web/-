@@ -85,11 +85,18 @@ class PowerAiEngine(
         insights
     }
 
-    suspend fun processQuery(question: String): String = withContext(Dispatchers.IO) {
+    suspend fun processQuery(
+        question: String,
+        canViewCosts: Boolean = false,
+        canViewReports: Boolean = false,
+        canViewInventory: Boolean = false,
+        canViewDebts: Boolean = false
+    ): String = withContext(Dispatchers.IO) {
         val q = question.trim().lowercase(Locale.ROOT)
 
         // 1. Sales Query
         if (q.contains("مبيع") || q.contains("بعنا") || q.contains("مبيعات") || q.contains("اليوم") || q.contains("دخل")) {
+            if (!canViewReports) return@withContext "لا تملك صلاحية عرض بيانات المبيعات والتقارير عبر المساعد الذكي."
             val allSales = saleDao.getAllSales().firstOrNull() ?: emptyList()
             val validSales = allSales.filter { it.status == "COMPLETED" }
             val totalRevenue = validSales.sumOf { it.netAmount }
@@ -108,6 +115,7 @@ class PowerAiEngine(
 
         // 2. Low Stock Query
         if (q.contains("مخزون") || q.contains("ناقص") || q.contains("منخفض") || q.contains("شراء") || q.contains("مواد")) {
+            if (!canViewInventory) return@withContext "لا تملك صلاحية عرض بيانات المخزون عبر المساعد الذكي."
             val lowStock = rawMaterialDao.getLowStockMaterialsSync()
             if (lowStock.isEmpty()) {
                 return@withContext "📦 تقرير المخزون الفعلي:\n" +
@@ -121,6 +129,7 @@ class PowerAiEngine(
 
         // 3. Debt Query
         if (q.contains("دين") || q.contains("ديون") || q.contains("عميل") || q.contains("رصيد") || q.contains("سداد")) {
+            if (!canViewDebts) return@withContext "لا تملك صلاحية عرض بيانات العملاء والديون عبر المساعد الذكي."
             val customers = customerDao.getAllCustomers().firstOrNull() ?: emptyList()
             val indebted = customers.filter { it.currentDebt > 0 }.sortedByDescending { it.currentDebt }
             if (indebted.isEmpty()) {
@@ -137,6 +146,7 @@ class PowerAiEngine(
 
         // 4. Product Cost Query
         if (q.contains("power full") || q.contains("تكلفة") || q.contains("باور فل") || q.contains("منتج") || q.contains("ربح")) {
+            if (!canViewCosts) return@withContext "لا تملك صلاحية عرض التكلفة والربح عبر المساعد الذكي."
             val allProducts = productDao.getAllProductsSync()
             val powerFull = allProducts.firstOrNull { it.name.contains("Power Full", ignoreCase = true) }
             val details = if (powerFull != null) {
@@ -154,6 +164,7 @@ class PowerAiEngine(
 
         // 5. Shift & Cash Discrepancy Query
         if (q.contains("شفت") || q.contains("فرق") || q.contains("عجز") || q.contains("نقدية") || q.contains("درج")) {
+            if (!canViewReports) return@withContext "لا تملك صلاحية عرض بيانات الشفتات والنقدية عبر المساعد الذكي."
             val allShifts = shiftDao.getAllShifts().firstOrNull() ?: emptyList()
             val problemShifts = allShifts.filter { Math.abs(it.discrepancyAmount) > 0.01 }
             if (problemShifts.isEmpty()) {

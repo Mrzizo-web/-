@@ -233,7 +233,7 @@ fun AdminMainScreen(
                     AdminTab.DASHBOARD -> AdminDashboardTab(sales, rawMaterials, customers, shifts)
                     AdminTab.SALES -> AdminSalesTab(sales, onVoidSale, currentUser.role)
                     AdminTab.PRODUCTS -> AdminProductsTab(products, categories, onAddProduct, onUpdateProductPrice, onToggleProductAvailable)
-                    AdminTab.RECIPES -> AdminRecipesTab(recipes, products, rawMaterials, mixtures)
+                    AdminTab.RECIPES -> AdminRecipesTab(recipes, products, rawMaterials, mixtures, PermissionChecker.hasPermission(currentUser.role, AppPermission.VIEW_COSTS))
                     AdminTab.INVENTORY -> AdminInventoryTab(rawMaterials, onAddRawMaterial, onRecordWaste, onApplyStockAdjustment)
                     AdminTab.PURCHASES -> AdminPurchasesTab(purchases, suppliers, rawMaterials, onCreatePurchase)
                     AdminTab.DEBTS -> AdminDebtsTab(customers, onAddCustomer, onRecordDebtPayment)

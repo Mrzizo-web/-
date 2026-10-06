@@ -42,8 +42,8 @@ fun LoginScreen(
     var localError by remember { mutableStateOf<String?>(null) }
     var isAuthenticating by remember { mutableStateOf(false) }
 
-    LaunchedEffect(enteredPin, selectedUser, errorMessage) {
-        isAuthenticating = false
+    LaunchedEffect(errorMessage) {
+        if (errorMessage != null) isAuthenticating = false
     }
 
     Box(
@@ -123,6 +123,7 @@ fun LoginScreen(
                             onClick = {
                                 selectedUser = if (isSelected) null else user
                                 enteredPin = ""
+                                isAuthenticating = false
                                 onClearError()
                                 localError = null
                             },
