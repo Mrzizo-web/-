@@ -91,7 +91,11 @@ fun AdminMainScreen(
     onExportCsvZip: () -> Unit,
     onExportXlsx: () -> Unit,
     onRestoreDatabase: () -> Unit,
-    onAskAi: suspend (String) -> String
+    onAskAi: suspend (String) -> String,
+    importPreview: com.example.data.importdata.ImportPreview?,
+    onPickImport: () -> Unit,
+    onConfirmImport: (com.example.data.importdata.ImportConflictStrategy) -> Unit,
+    onCancelImport: () -> Unit
 ) {
     // Strict RBAC check at view level: Cashier cannot access
     if (!currentUser.role.canAccessAdmin) {
