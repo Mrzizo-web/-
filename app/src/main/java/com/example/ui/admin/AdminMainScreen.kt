@@ -1,6 +1,10 @@
 package com.example.ui.admin
 
-import androidx.compose.foundation.background
+im    importPreview: com.example.data.importdata.ImportPreview?,
+    onPickImport: () -> Unit,
+    onConfirmImport: (com.example.data.importdata.ImportConflictStrategy) -> Unit,
+    onCancelImport: () -> Unit,
+port androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -269,7 +273,17 @@ fun AdminMainScreen(
                     AdminTab.REPORTS -> AdminReportsTab(sales, products, rawMaterials)
                     AdminTab.AUDIT_LOG -> AdminAuditLogTab(auditLogs)
                     AdminTab.POWER_AI -> AdminPowerAiTab(onAskAi)
-                    AdminTab.SETTINGS -> AdminSettingsTab(users, onExportDatabase, onExportCsvZip, onExportXlsx, onRestoreDatabase)
+                    AdminTab.SETTINGS -> AdminSettingsTab(
+                        users = users,
+                        onExportDatabase = onExportDatabase,
+                        onExportCsvZip = onExportCsvZip,
+                        onExportXlsx = onExportXlsx,
+                        onRestoreDatabase = onRestoreDatabase,
+                        importPreview = importPreview,
+                        onPickImport = onPickImport,
+                        onConfirmImport = onConfirmImport,
+                        onCancelImport = onCancelImport
+                    )
                 }
             }
         }
