@@ -45,6 +45,12 @@ class MainActivity : ComponentActivity() {
                 val exportBackup = rememberLauncherForActivityResult(
                     ActivityResultContracts.CreateDocument("application/vnd.sqlite3")
                 ) { uri: Uri? -> uri?.let(viewModel::exportDatabase) }
+                val exportCsvZip = rememberLauncherForActivityResult(
+                    ActivityResultContracts.CreateDocument("application/zip")
+                ) { uri: Uri? -> uri?.let(viewModel::exportDataCsvZip) }
+                val exportXlsx = rememberLauncherForActivityResult(
+                    ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                ) { uri: Uri? -> uri?.let(viewModel::exportDataXlsx) }
                 val restoreBackup = rememberLauncherForActivityResult(
                     ActivityResultContracts.OpenDocument()
                 ) { uri: Uri? ->
@@ -163,6 +169,25 @@ class MainActivity : ComponentActivity() {
                                         onAddProduct = { name, catId, price -> viewModel.addProduct(name, catId, price) },
                                         onUpdateProductPrice = { id, p -> viewModel.updateProductPrice(id, p) },
                                         onToggleProductAvailable = { id, avail -> viewModel.toggleProductAvailable(id, avail) },
+                                        onCreateRecipe = { productId, name, notes, items ->
+                                            viewModel.createRecipe(productId, name, notes, items)
+                                        },
+                                        onUpdateRecipe = { recipeId, name, notes, items ->
+                                            viewModel.updateRecipe(recipeId, name, notes, items)
+                                        },
+                                        onToggleRecipeActive = { recipeId, active ->
+                                            viewModel.toggleRecipeActive(recipeId, active)
+                                        },
+                                        onDeleteRecipe = { recipeId -> viewModel.deleteRecipe(recipeId) },
+                                        onCreateMixture = { name, unit, output, notes, items ->
+                                            viewModel.createMixture(name, unit, output, notes, items)
+                                        },
+                                        onUpdateMixture = { id, name, unit, output, notes, items ->
+                                            viewModel.updateMixture(id, name, unit, output, notes, items)
+                                        },
+                                        onDeleteMixture = { id -> viewModel.deleteMixture(id) },
+                                        onLoadRecipeItems = viewModel::loadRecipeItems,
+                                        onLoadMixtureItems = viewModel::loadMixtureItems,
                                         onAddRawMaterial = { name, sku, unit, minStock, price -> viewModel.addRawMaterial(name, sku, unit, minStock, price) },
                                         onCreatePurchase = { sId, sName, inv, mId, q, u, p ->
                                             viewModel.createPurchase(sId, sName, inv, mId, q, u, p)
@@ -185,6 +210,12 @@ class MainActivity : ComponentActivity() {
                                         },
                                         onExportDatabase = {
                                             exportBackup.launch("power-feul-pos-backup.db")
+                                        },
+                                        onExportCsvZip = {
+                                            exportCsvZip.launch("power-feul-pos-data-csv.zip")
+                                        },
+                                        onExportXlsx = {
+                                            exportXlsx.launch("power-feul-pos-data.xlsx")
                                         },
                                         onRestoreDatabase = {
                                             restoreBackup.launch(arrayOf("application/vnd.sqlite3", "application/octet-stream"))
