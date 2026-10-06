@@ -1261,73 +1261,245 @@ fun AdminSettingsTab(
     onExportDatabase: () -> Unit,
     onExportCsvZip: () -> Unit,
     onExportXlsx: () -> Unit,
-    onRestoreDatabase: () -> Unit
+    onRestoreDatabase: () -> Unit,
+    importPreview: com.example.data.importdata.ImportPreview?,
+    onPickImport: () -> Unit,
+    onConfirmImport: (com.example.data.importdata.ImportConflictStrategy) -> Unit,
+    onCancelImport: () -> Unit
 ) {
+    var importStrategy by remember(importPreview) {
+        mutableStateOf(com.example.data.importdata.ImportConflictStrategy.SKIP)
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
-        Text("إعدادات النظام والكافتيريا", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
-        Text("بيانات المنشأة، العملة، صلاحيات الموظفين، والنسخ الاحتياطي", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "إعدادات النظام والكافتيريا",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Black
+        )
+        Text(
+            "بيانات المنشأة، العملة، صلاحيات الموظفين، والنسخ الاحتياطي",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Card(
             modifier = Modifier.fillMaxSize(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text("بيانات الكافتيريا الرسمية", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(
+                    "بيانات الكافتيريا الرسمية",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
                 Spacer(modifier = Modifier.height(10.dp))
                 Text("اسم الكافتيريا: POWER FEUL", fontSize = 14.sp)
                 Text("النادي: Power Home Gym", fontSize = 14.sp)
                 Text("العملة الرسمية: الريال اليمني (YER)", fontSize = 14.sp)
-                Text("الجهاز المستهدف: Samsung Galaxy Tab S7+ (شاشة لمس Tablet)", fontSize = 14.sp)
+                Text(
+                    "الجهاز المستهدف: Samsung Galaxy Tab S7+ (شاشة لمس Tablet)",
+                    fontSize = 14.sp
+                )
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
-                Text("الموظفون المعتمدون (${users.size} موظف):", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(
+                    "الموظفون المعتمدون (" + users.size + " موظف):",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
+                )
                 Spacer(modifier = Modifier.height(8.dp))
-                users.forEach { u ->
-                    Text("• ${u.name} — الدور: ${u.role.titleAr}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                users.forEach { user ->
+                    Text(
+                        "• " + user.name + " — الدور: " + user.role.titleAr,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-                Text("النسخ الاحتياطي والاستعادة", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+
+                Text(
+                    "النسخ الاحتياطي والاستعادة والتبادل",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    "صدّر نسخة من بيانات المبيعات والمخزون إلى ملف، أو استعد نسخة موثوقة. الاستعادة غير متاحة أثناء شفت مفتوح وستُعاد تشغيل الواجهة بعدها.",
+                    "النسخة الاحتياطية تحفظ قاعدة البيانات كاملة. CSV وExcel يصدّران البيانات القابلة للمشاركة، والاستيراد يمر على معاينة وتحقق ثم Transaction واحدة.",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(12.dp))
+
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Button(
                         onClick = onExportDatabase,
-                        colors = ButtonDefaults.buttonColors(containerColor = PowerOrange)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = PowerOrange
+                        )
                     ) {
-                        Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.Default.UploadFile,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("نسخة احتياطية")
                     }
                     OutlinedButton(onClick = onExportCsvZip) {
-                        Icon(Icons.Default.TableView, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.Default.TableView,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("CSV كامل")
                     }
                     OutlinedButton(onClick = onExportXlsx) {
-                        Icon(Icons.Default.GridOn, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.Default.GridOn,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Excel")
                     }
-                    OutlinedButton(onClick = onRestoreDatabase) {
-                        Icon(Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(18.dp))
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(onClick = onPickImport) {
+                        Icon(
+                            Icons.Default.FileUpload,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("استعادة نسخة")
+                        Text("استيراد CSV")
+                    }
+                    OutlinedButton(onClick = onRestoreDatabase) {
+                        Icon(
+                            Icons.Default.Restore,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("استعادة نسخة احتياطية")
                     }
                 }
             }
         }
     }
+
+    if (importPreview != null) {
+        AlertDialog(
+            onDismissRequest = onCancelImport,
+            title = { Text("معاينة استيراد البيانات") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        "الإجمالي: " + importPreview.totalRows +
+                            " سجل • صالح: " + importPreview.totalValidRows +
+                            " • غير صالح: " + importPreview.totalInvalidRows +
+                            " • مكرر داخل الملف: " + importPreview.totalDuplicates,
+                        fontSize = 12.sp
+                    )
+                    Text(
+                        "بيانات المستخدمين لا تُستورد من CSV لحماية بيانات الاعتماد؛ استخدم النسخة الاحتياطية الكاملة لنقل قاعدة المستخدمين.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.error
+                    )
+
+                    LazyColumn(Modifier.heightIn(max = 280.dp)) {
+                        items(importPreview.tables) { table ->
+                            Column(
+                                Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            ) {
+                                Text(
+                                    table.table,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    "السجلات: " + table.rows +
+                                        " • صالح: " + table.validRows +
+                                        " • غير صالح: " + table.invalidRows +
+                                        " • مكرر: " + table.duplicateRows,
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                table.error?.let {
+                                    Text(
+                                        it,
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Text("استراتيجية التعارض", fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(
+                            selected = importStrategy == com.example.data.importdata.ImportConflictStrategy.SKIP,
+                            onClick = {
+                                importStrategy =
+                                    com.example.data.importdata.ImportConflictStrategy.SKIP
+                            }
+                        )
+                        Text("تجاهل السجل المتعارض")
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(
+                            selected = importStrategy == com.example.data.importdata.ImportConflictStrategy.REPLACE,
+                            onClick = {
+                                importStrategy =
+                                    com.example.data.importdata.ImportConflictStrategy.REPLACE
+                            }
+                        )
+                        Text("استبدال السجل المتعارض")
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(
+                            selected = importStrategy == com.example.data.importdata.ImportConflictStrategy.ABORT,
+                            onClick = {
+                                importStrategy =
+                                    com.example.data.importdata.ImportConflictStrategy.ABORT
+                            }
+                        )
+                        Text("إلغاء العملية عند التعارض")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { onConfirmImport(importStrategy) },
+                    enabled = importPreview.totalInvalidRows == 0 &&
+                        importPreview.tables.isNotEmpty()
+                ) {
+                    Text("تأكيد الاستيراد")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onCancelImport) {
+                    Text("إلغاء")
+                }
+            }
+        )
+    }
 }
+
