@@ -1259,6 +1259,8 @@ fun AdminPowerAiTab(onAskAi: suspend (String) -> String) {
 fun AdminSettingsTab(
     users: List<UserEntity>,
     onExportDatabase: () -> Unit,
+    onExportCsvZip: () -> Unit,
+    onExportXlsx: () -> Unit,
     onRestoreDatabase: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -1297,11 +1299,27 @@ fun AdminSettingsTab(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(onClick = onExportDatabase, colors = ButtonDefaults.buttonColors(containerColor = PowerOrange)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Button(
+                        onClick = onExportDatabase,
+                        colors = ButtonDefaults.buttonColors(containerColor = PowerOrange)
+                    ) {
                         Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("تصدير نسخة")
+                        Text("نسخة احتياطية")
+                    }
+                    OutlinedButton(onClick = onExportCsvZip) {
+                        Icon(Icons.Default.TableView, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("CSV كامل")
+                    }
+                    OutlinedButton(onClick = onExportXlsx) {
+                        Icon(Icons.Default.GridOn, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Excel")
                     }
                     OutlinedButton(onClick = onRestoreDatabase) {
                         Icon(Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(18.dp))
