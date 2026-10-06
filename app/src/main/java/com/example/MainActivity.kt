@@ -51,6 +51,9 @@ class MainActivity : ComponentActivity() {
                 val exportXlsx = rememberLauncherForActivityResult(
                     ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                 ) { uri: Uri? -> uri?.let(viewModel::exportDataXlsx) }
+                val importCsv = rememberLauncherForActivityResult(
+                    ActivityResultContracts.OpenDocument()
+                ) { uri: Uri? -> uri?.let(viewModel::previewDataImport) }
                 val restoreBackup = rememberLauncherForActivityResult(
                     ActivityResultContracts.OpenDocument()
                 ) { uri: Uri? ->
@@ -62,6 +65,7 @@ class MainActivity : ComponentActivity() {
                 val activeScreen by viewModel.activeScreen.collectAsStateWithLifecycle()
                 val snackbarMessage by viewModel.snackbarMessage.collectAsStateWithLifecycle()
 
+                val importPreview by viewModel.dataImportPreview.collectAsStateWithLifecycle()
                 val snackbarHostState = remember { SnackbarHostState() }
 
                 LaunchedEffect(snackbarMessage) {
@@ -208,6 +212,7 @@ class MainActivity : ComponentActivity() {
                                         onVoidSale = { saleId, reason ->
                                             viewModel.voidSale(saleId, reason)
                                         },
+                                        importPreview = importPreview,
                                         onExportDatabase = {
                                             exportBackup.launch("power-feul-pos-backup.db")
                                         },
@@ -216,6 +221,15 @@ class MainActivity : ComponentActivity() {
                                         },
                                         onExportXlsx = {
                                             exportXlsx.launch("power-feul-pos-data.xlsx")
+                                        },
+                                        onPickImport = {
+                                            importCsv.launch(arrayOf("application/zip", "application/octet-stream"))
+                                        },
+                                        onConfirmImport = { strategy ->
+                                            viewModel.confirmDataImport(strategy)
+                                        },
+                                        onCancelImport = {
+                                            viewModel.cancelDataImport()
                                         },
                                         onRestoreDatabase = {
                                             restoreBackup.launch(arrayOf("application/vnd.sqlite3", "application/octet-stream"))
