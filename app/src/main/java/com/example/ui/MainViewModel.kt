@@ -1083,18 +1083,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 logUnauthorizedAttempt(user, AppPermission.MANAGE_SETTINGS, "استعادة نسخة احتياطية")
                 return@launch
             }
+
+            db.auditLogDao().insertLog(
+                AuditLogEntity(
+                    userId = user.id,
+                    userName = user.name,
+                    userRole = user.role.titleAr,
+                    action = "DATA_IMPORT_STARTED",
+                    entityType = "BACKUP",
+                    entityId = "DB",
+                    notes = "بدء استعادة نسخة احتياطية"
+                )
+            )
+
             DatabaseBackupManager.restore(getApplication(), source)
                 .onSuccess {
-                    db.auditLogDao().insertLog(
-                        AuditLogEntity(
-                            userId = user.id, userName = user.name, userRole = user.role.titleAr,
-                            action = "DATA_IMPORTED", entityType = "BACKUP", entityId = "DB",
-                            notes = "استعادة نسخة احتياطية كاملة بنجاح"
-                        )
-                    )
                     withContext(Dispatchers.Main) { onRestored() }
                 }
-                .onFailure { snackbarMessage.value = "تعذرت الاستعادة: " + (it.localizedMessage ?: "خطأ غير متوقع") }
+                .onFailure {
+                    snackbarMessage.value = "تعذرت الاستعادة: " + (it.localizedMessage ?: "خطأ غير متوقع")
+                }
         }
     }
 
