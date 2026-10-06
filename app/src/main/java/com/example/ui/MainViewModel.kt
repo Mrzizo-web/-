@@ -62,6 +62,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val purchaseEngine = PurchaseEngine(db, inventoryEngine, costEngine)
     private val powerAiEngine = PowerAiEngine(db)
     private val recipeManagementEngine = RecipeManagementEngine(db)
+    private val dataImportEngine = DataImportEngine(db)
 
     // Current Session State
     private val _currentUser = MutableStateFlow<UserEntity?>(null)
@@ -992,6 +993,60 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             DataExportEngine.exportXlsx(getApplication(), db, destination)
                 .onSuccess { result -> snackbarMessage.value = "تم تصدير Excel كامل لجميع الجداول (" + result.rows + " سجل)" }
                 .onFailure { snackbarMessage.value = "تعذر تصدير Excel: " + (it.localizedMessage ?: "خطأ غير متوقع") }
+        }
+    }
+
+    fun previewDataImport(uri: Uri) {
+        val user = _currentUser.value ?: return
+        if (!PermissionChecker.hasPermission(user, AppPermission.MANAGE_SETTINGS)) {
+            viewModelScope.launch(Dispatchers.IO) {
+                logUnauthorizedAttempt(user, AppPermission.MANAGE_SETTINGS, "معاينة استيراد البيانات")
+            }
+            return
+        }
+        pendingImportUri = uri
+        viewModelScope.launch(Dispatchers.IO) {
+            dataImportEngine.previewCsvZip(getApplication(), uri)
+                .onSuccess { dataImportPreview.value = it }
+                .onFailure {
+                    dataImportPreview.value = null
+                    snackbarMessage.value = "تعذر قراءة ملف الاستيراد: " + (it.localizedMessage ?: "خطأ غير متوقع")
+                }
+        }
+    }
+
+    fun cancelDataImport() {
+        pendingImportUri = null
+        dataImportPreview.value = null
+    }
+
+    fun confirmDataImport(strategy: ImportConflictStrategy) {
+        val user = _currentUser.value ?: return
+        val uri = pendingImportUri ?: return
+        if (!PermissionChecker.hasPermission(user, AppPermission.MANAGE_SETTINGS)) {
+            viewModelScope.launch(Dispatchers.IO) {
+                logUnauthorizedAttempt(user, AppPermission.MANAGE_SETTINGS, "تنفيذ استيراد البيانات")
+            }
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            dataImportEngine.importCsvZip(
+                context = getApplication(),
+                uri = uri,
+                conflictStrategy = strategy,
+                confirmed = true
+            ).onSuccess { result ->
+                pendingImportUri = null
+                dataImportPreview.value = null
+                snackbarMessage.value =
+                    "اكتمل الاستيراد: أضيف " + result.importedRows +
+                        "، تم تجاوز " + result.skippedRows +
+                        "، واستُبدل " + result.replacedRows + " سجل."
+            }.onFailure {
+                snackbarMessage.value =
+                    "فشل الاستيراد وتم التراجع عن العملية بالكامل: " +
+                        (it.localizedMessage ?: "خطأ غير متوقع")
+            }
         }
     }
 
