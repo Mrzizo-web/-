@@ -1061,14 +1061,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 .onSuccess {
                     db.auditLogDao().insertLog(
                         AuditLogEntity(
-                            userId = user.id, userName = user.name, userRole = user.role.titleAr,
-                            action = "DATA_EXPORTED", entityType = "BACKUP", entityId = "DB",
+                            userId = user.id,
+                            userName = user.name,
+                            userRole = user.role.titleAr,
+                            action = "DATA_EXPORTED",
+                            entityType = "BACKUP",
+                            entityId = "DB",
                             notes = "تصدير نسخة احتياطية كاملة"
                         )
                     )
                     snackbarMessage.value = "تم تصدير النسخة الاحتياطية بنجاح"
                 }
-                .onFailure { snackbarMessage.value = "تعذر تصدير النسخة الاحتياطية: " + (it.localizedMessage ?: "خطأ غير متوقع") }
+                .onFailure {
+                    snackbarMessage.value = "تعذر تصدير النسخة الاحتياطية: " +
+                        (it.localizedMessage ?: "خطأ غير متوقع")
+                }
         }
     }
 
@@ -1083,7 +1090,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 logUnauthorizedAttempt(user, AppPermission.MANAGE_SETTINGS, "استعادة نسخة احتياطية")
                 return@launch
             }
-
             db.auditLogDao().insertLog(
                 AuditLogEntity(
                     userId = user.id,
@@ -1095,13 +1101,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     notes = "بدء استعادة نسخة احتياطية"
                 )
             )
-
             DatabaseBackupManager.restore(getApplication(), source)
                 .onSuccess {
                     withContext(Dispatchers.Main) { onRestored() }
                 }
                 .onFailure {
-                    snackbarMessage.value = "تعذرت الاستعادة: " + (it.localizedMessage ?: "خطأ غير متوقع")
+                    snackbarMessage.value = "تعذرت الاستعادة: " +
+                        (it.localizedMessage ?: "خطأ غير متوقع")
                 }
         }
     }
