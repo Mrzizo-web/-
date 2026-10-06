@@ -211,7 +211,9 @@ class DataImportEngine(
                     require(!quoted) { "ملف CSV غير مكتمل الاقتباس: " + table }
                     require(csvRows.isNotEmpty()) { "ملف CSV فارغ: " + table }
 
-                    val header = csvRows.first()
+                    val header = csvRows.first().mapIndexed { index, value ->
+                        if (index == 0) value.removePrefix("\uFEFF") else value
+                    }
                     val dataRows = csvRows.drop(1).map { values ->
                         require(values.size == header.size) {
                             "عدد أعمدة السجل لا يطابق العنوان في " + table
