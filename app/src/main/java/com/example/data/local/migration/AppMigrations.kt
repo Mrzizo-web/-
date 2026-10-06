@@ -34,13 +34,14 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
                 val id = cursor.getString(0)
                 val name = cursor.getString(1)
                 val username = cursor.getString(2)
-                val rawPin = cursor.getString(3) ?: "1234"
+                val rawPin = cursor.getString(3)
                 val role = cursor.getString(4)
                 val phone = cursor.getString(5) ?: ""
                 val isActive = cursor.getInt(6)
                 val createdAt = cursor.getLong(7)
 
-                val hashResult = PasswordHasher.DEFAULT.hash(rawPin.ifBlank { "1234" })
+                require(rawPin.isNotBlank()) { "تعذر ترحيل المستخدم $id: رمز PIN القديم فارغ" }
+                val hashResult = PasswordHasher.DEFAULT.hash(rawPin)
 
                 db.execSQL(
                     """
