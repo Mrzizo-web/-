@@ -78,6 +78,8 @@ fun AdminMainScreen(
     onRecordWaste: (materialId: String, qty: Double, unit: String, reason: String, notes: String) -> Unit,
     onApplyStockAdjustment: (materialId: String, actualStock: Double, reason: String) -> Unit,
     onVoidSale: (saleId: String, reason: String) -> Unit,
+    onExportDatabase: () -> Unit,
+    onRestoreDatabase: () -> Unit,
     onAskAi: suspend (String) -> String
 ) {
     // Strict RBAC check at view level: Cashier cannot access
@@ -241,7 +243,7 @@ fun AdminMainScreen(
                     AdminTab.REPORTS -> AdminReportsTab(sales, products, rawMaterials)
                     AdminTab.AUDIT_LOG -> AdminAuditLogTab(auditLogs)
                     AdminTab.POWER_AI -> AdminPowerAiTab(onAskAi)
-                    AdminTab.SETTINGS -> AdminSettingsTab(users)
+                    AdminTab.SETTINGS -> AdminSettingsTab(users, onExportDatabase, onRestoreDatabase)
                 }
             }
         }

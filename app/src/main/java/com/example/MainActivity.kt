@@ -1,6 +1,10 @@
 package com.example
 
 import android.os.Bundle
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -37,6 +41,16 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             PowerFeulTheme {
+                val exportBackup = rememberLauncherForActivityResult(
+                    ActivityResultContracts.CreateDocument("application/vnd.sqlite3")
+                ) { uri: Uri? -> uri?.let(viewModel::exportDatabase) }
+                val restoreBackup = rememberLauncherForActivityResult(
+                    ActivityResultContracts.OpenDocument()
+                ) { uri: Uri? ->
+                    uri?.let { selected ->
+                        viewModel.restoreDatabase(selected) { restartAfterRestore() }
+                    }
+                }
                 val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
                 val activeScreen by viewModel.activeScreen.collectAsStateWithLifecycle()
                 val snackbarMessage by viewModel.snackbarMessage.collectAsStateWithLifecycle()
@@ -168,6 +182,12 @@ class MainActivity : ComponentActivity() {
                                         onVoidSale = { saleId, reason ->
                                             viewModel.voidSale(saleId, reason)
                                         },
+                                        onExportDatabase = {
+                                            exportBackup.launch("power-feul-pos-backup.db")
+                                        },
+                                        onRestoreDatabase = {
+                                            restoreBackup.launch(arrayOf("application/vnd.sqlite3", "application/octet-stream"))
+                                        },
                                         onAskAi = { prompt -> viewModel.askAi(prompt) }
                                     )
                                 }
@@ -243,5 +263,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun restartAfterRestore() {
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        }
+        if (launchIntent != null) startActivity(launchIntent)
+        finishAffinity()
     }
 }

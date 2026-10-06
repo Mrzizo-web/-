@@ -1256,7 +1256,11 @@ fun AdminPowerAiTab(onAskAi: suspend (String) -> String) {
 }
 
 @Composable
-fun AdminSettingsTab(users: List<UserEntity>) {
+fun AdminSettingsTab(
+    users: List<UserEntity>,
+    onExportDatabase: () -> Unit,
+    onRestoreDatabase: () -> Unit
+) {
     Column(modifier = Modifier.fillMaxSize()) {
         Text("إعدادات النظام والكافتيريا", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
         Text("بيانات المنشأة، العملة، صلاحيات الموظفين، والنسخ الاحتياطي", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1282,6 +1286,28 @@ fun AdminSettingsTab(users: List<UserEntity>) {
                 Spacer(modifier = Modifier.height(8.dp))
                 users.forEach { u ->
                     Text("• ${u.name} — الدور: ${u.role.titleAr}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+                Text("النسخ الاحتياطي والاستعادة", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    "صدّر نسخة من بيانات المبيعات والمخزون إلى ملف، أو استعد نسخة موثوقة. الاستعادة غير متاحة أثناء شفت مفتوح وستُعاد تشغيل الواجهة بعدها.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(onClick = onExportDatabase, colors = ButtonDefaults.buttonColors(containerColor = PowerOrange)) {
+                        Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("تصدير نسخة")
+                    }
+                    OutlinedButton(onClick = onRestoreDatabase) {
+                        Icon(Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("استعادة نسخة")
+                    }
                 }
             }
         }

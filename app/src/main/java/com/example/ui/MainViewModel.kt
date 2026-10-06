@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.engine.*
+import com.example.data.backup.DatabaseBackupManager
 import com.example.data.local.AppDatabase
 import com.example.data.local.entity.*
 import com.example.data.seed.DatabaseSeeder
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import android.net.Uri
 
 enum class AppScreen {
     POS,
@@ -890,6 +892,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }.onFailure {
                 snackbarMessage.value = "تعذر إلغاء الفاتورة: ${it.localizedMessage}"
             }
+        }
+    }
+
+    fun exportDatabase(destination: Uri) {
+        val user = _currentUser.value ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            if (!PermissionChecker.hasPermission(user, AppPermission.MANAGE_SETTINGS)) {
+                logUnauthorizedAttempt(user, AppPermission.MANAGE_SETTINGS, "تصدير نسخة احتياطية")
+                return@launch
+            }
+            DatabaseBackupManager.export(getApplication(), db, destination)
+                .onSuccess { snackbarMessage.value = "تم تصدير النسخة الاحتياطية بنجاح" }
+                .onFailure { snackbarMessage.value = "تعذر تصدير النسخة الاحتياطية: ${it.localizedMessage}" }
+        }
+    }
+
+    fun restoreDatabase(source: Uri, onRestored: () -> Unit) {
+        val user = _currentUser.value ?: return
+        if (currentShift.value != null) {
+            snackbarMessage.value = "أغلق الشفت الحالي قبل استعادة نسخة احتياطية"
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            if (!PermissionChecker.hasPermission(user, AppPermission.MANAGE_SETTINGS)) {
+                logUnauthorizedAttempt(user, AppPermission.MANAGE_SETTINGS, "استعادة نسخة احتياطية")
+                return@launch
+            }
+            DatabaseBackupManager.restore(getApplication(), source)
+                .onSuccess {
+                    withContext(Dispatchers.Main) { onRestored() }
+                }
+                .onFailure { snackbarMessage.value = "تعذرت الاستعادة: ${it.localizedMessage}" }
         }
     }
 

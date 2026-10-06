@@ -78,5 +78,15 @@ abstract class AppDatabase : RoomDatabase() {
                 instance
             }
         }
+
+        /**
+         * Used only by the restore flow, immediately before the app is relaunched.
+         * Closing Room first prevents copying a partially-flushed WAL database.
+         */
+        @Synchronized
+        fun closeAndClearInstance() {
+            INSTANCE?.close()
+            INSTANCE = null
+        }
     }
 }
