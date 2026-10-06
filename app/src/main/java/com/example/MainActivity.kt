@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.domain.model.UserProfile
 import com.example.ui.AppScreen
 import com.example.ui.MainViewModel
 import com.example.ui.admin.AdminMainScreen
