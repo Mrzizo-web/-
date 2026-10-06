@@ -51,6 +51,7 @@ class DataImportEngine(
     ): Result<ImportPreview> = withContext(Dispatchers.IO) {
         runCatching {
             val tables = readZipTables(context, uri)
+                .filterKeys { it != "users" }
             val db = database.openHelper.readableDatabase
             val previews = tables.map { table ->
                 previewTable(db, table.key, table.value)
@@ -203,8 +204,7 @@ class DataImportEngine(
                         if (!quoted) {
                             finishRecord()
                         } else {
-                            field.append('
-')
+                            field.append('\\n')
                         }
                     }
 
