@@ -164,6 +164,15 @@ interface RecipeDao {
 
     @Update
     suspend fun updateRecipe(recipe: RecipeEntity)
+
+    @Query("UPDATE recipes SET isActive = :isActive WHERE id = :id")
+    suspend fun setRecipeActive(id: String, isActive: Boolean)
+
+    @Query("DELETE FROM recipes WHERE id = :id")
+    suspend fun deleteRecipe(id: String)
+
+    @Query("SELECT COUNT(*) FROM recipe_items WHERE mixtureId = :mixtureId")
+    suspend fun countRecipeItemsUsingMixture(mixtureId: String): Int
 }
 
 @Dao
