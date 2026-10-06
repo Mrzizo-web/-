@@ -327,7 +327,7 @@ class SalesEngine(
                         userId = user.id,
                         userName = user.name,
                         userRole = user.role.titleAr,
-                        action = "VOID",
+                        action = "SALE_VOIDED",
                         entityType = "SALE",
                         entityId = sale.invoiceNumber,
                         previousValue = "${sale.netAmount} YER (${sale.paymentMethod.titleAr})",
