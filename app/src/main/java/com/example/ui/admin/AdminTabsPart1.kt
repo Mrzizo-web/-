@@ -546,106 +546,31 @@ fun AdminRecipesTab(
     products: List<ProductEntity>,
     rawMaterials: List<RawMaterialEntity>,
     mixtures: List<MixtureEntity>,
-    canViewCosts: Boolean
+    canViewCosts: Boolean,
+    onCreateRecipe: (String, String, String, List<com.example.data.engine.RecipeIngredientDraft>) -> Unit,
+    onUpdateRecipe: (String, String, String, List<com.example.data.engine.RecipeIngredientDraft>) -> Unit,
+    onToggleRecipeActive: (String, Boolean) -> Unit,
+    onDeleteRecipe: (String) -> Unit,
+    onCreateMixture: (String, String, Double, String, List<com.example.data.engine.MixtureIngredientDraft>) -> Unit,
+    onUpdateMixture: (String, String, String, Double, String, List<com.example.data.engine.MixtureIngredientDraft>) -> Unit,
+    onDeleteMixture: (String) -> Unit,
+    onLoadRecipeItems: suspend (String) -> List<RecipeItemEntity>,
+    onLoadMixtureItems: suspend (String) -> List<MixtureItemEntity>
 ) {
-    var selectedSection by remember { mutableStateOf(0) } // 0: Recipes, 1: Mixtures
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text("الوصفات والخلطات المعيارية (Recipes & Blends)", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
-                Text("تحديد نسب ومقادير كل مشروب لحساب التكلفة الدقيقة وخصم المخزون آلياً عند كل عملية بيع", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-
-            TabRow(
-                selectedTabIndex = selectedSection,
-                modifier = Modifier.width(260.dp)
-            ) {
-                Tab(
-                    selected = selectedSection == 0,
-                    onClick = { selectedSection = 0 },
-                    text = { Text("الوصفات (${recipes.size})") }
-                )
-                Tab(
-                    selected = selectedSection == 1,
-                    onClick = { selectedSection = 1 },
-                    text = { Text("الخلطات (${mixtures.size})") }
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Card(
-            modifier = Modifier.fillMaxSize(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            if (selectedSection == 0) {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(recipes) { recipe ->
-                        val product = products.firstOrNull { it.id == recipe.productId }
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(recipe.name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Surface(shape = RoundedCornerShape(4.dp), color = PowerOrange.copy(alpha = 0.15f)) {
-                                        Text("الإصدار v${recipe.version}", fontSize = 10.sp, color = PowerOrange, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
-                                    }
-                                }
-                                Text("المنتج المرتبط: ${product?.name ?: "غير محدد"}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-
-                            Column(horizontalAlignment = Alignment.End) {
-                                if (canViewCosts) {
-                                    Text("التكلفة المعيارية: ${recipe.calculatedCost.toLong()} ريال", fontWeight = FontWeight.Bold, color = StatusSuccess)
-                                }
-                                if (product != null) {
-                                    if (canViewCosts) {
-                                        Text("سعر البيع: ${product.price.toLong()} ريال", fontSize = 12.sp)
-                                    }
-                                }
-                            }
-                        }
-                        HorizontalDivider()
-                    }
-                }
-            } else {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(mixtures) { mix ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(mix.name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                Text("الكمية الناتجة: ${mix.outputQuantity} ${mix.unit} • ملاحظات: ${mix.notes.ifEmpty { "لا توجد" }}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Column(horizontalAlignment = Alignment.End) {
-                                if (canViewCosts) {
-                                    Text("إجمالي التكلفة: ${mix.totalCost.toLong()} ريال", fontWeight = FontWeight.Bold, color = StatusSuccess)
-                                    Text("تكلفة الوحدة: ${mix.unitCost} ريال / ${mix.unit}", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
-                                }
-                            }
-                        }
-                        HorizontalDivider()
-                    }
-                }
-            }
-        }
-    }
+    RecipeManagementTab(
+        recipes = recipes,
+        products = products,
+        rawMaterials = rawMaterials,
+        mixtures = mixtures,
+        canViewCosts = canViewCosts,
+        onCreateRecipe = onCreateRecipe,
+        onUpdateRecipe = onUpdateRecipe,
+        onToggleRecipeActive = onToggleRecipeActive,
+        onDeleteRecipe = onDeleteRecipe,
+        onCreateMixture = onCreateMixture,
+        onUpdateMixture = onUpdateMixture,
+        onDeleteMixture = onDeleteMixture,
+        onLoadRecipeItems = onLoadRecipeItems,
+        onLoadMixtureItems = onLoadMixtureItems
+    )
 }
