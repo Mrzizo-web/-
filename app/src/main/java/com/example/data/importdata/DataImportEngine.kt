@@ -182,7 +182,8 @@ class DataImportEngine(
                         }
                     }
 
-                    reader.forEachLine { line ->
+                    while (true) {
+                        val line = reader.readLine() ?: break
                         var i = 0
                         while (i < line.length) {
                             val ch = line[i]
@@ -202,9 +203,11 @@ class DataImportEngine(
                         if (!quoted) {
                             finishRecord()
                         } else {
-                            field.append('\n')
+                            field.append('
+')
                         }
                     }
+
                     require(!quoted) { "ملف CSV غير مكتمل الاقتباس: " + table }
                     require(csvRows.isNotEmpty()) { "ملف CSV فارغ: " + table }
 
