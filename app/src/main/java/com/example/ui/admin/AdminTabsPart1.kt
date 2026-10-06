@@ -545,7 +545,8 @@ fun AdminRecipesTab(
     recipes: List<RecipeEntity>,
     products: List<ProductEntity>,
     rawMaterials: List<RawMaterialEntity>,
-    mixtures: List<MixtureEntity>
+    mixtures: List<MixtureEntity>,
+    canViewCosts: Boolean
 ) {
     var selectedSection by remember { mutableStateOf(0) } // 0: Recipes, 1: Mixtures
 
@@ -607,9 +608,13 @@ fun AdminRecipesTab(
                             }
 
                             Column(horizontalAlignment = Alignment.End) {
-                                Text("التكلفة المعيارية: ${recipe.calculatedCost.toLong()} ريال", fontWeight = FontWeight.Bold, color = StatusSuccess)
+                                if (canViewCosts) {
+                                    Text("التكلفة المعيارية: ${recipe.calculatedCost.toLong()} ريال", fontWeight = FontWeight.Bold, color = StatusSuccess)
+                                }
                                 if (product != null) {
-                                    Text("سعر البيع: ${product.price.toLong()} ريال", fontSize = 12.sp)
+                                    if (canViewCosts) {
+                                        Text("سعر البيع: ${product.price.toLong()} ريال", fontSize = 12.sp)
+                                    }
                                 }
                             }
                         }
@@ -631,8 +636,10 @@ fun AdminRecipesTab(
                                 Text("الكمية الناتجة: ${mix.outputQuantity} ${mix.unit} • ملاحظات: ${mix.notes.ifEmpty { "لا توجد" }}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Column(horizontalAlignment = Alignment.End) {
-                                Text("إجمالي التكلفة: ${mix.totalCost.toLong()} ريال", fontWeight = FontWeight.Bold, color = StatusSuccess)
-                                Text("تكلفة الوحدة: ${mix.unitCost} ريال / ${mix.unit}", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
+                                if (canViewCosts) {
+                                    Text("إجمالي التكلفة: ${mix.totalCost.toLong()} ريال", fontWeight = FontWeight.Bold, color = StatusSuccess)
+                                    Text("تكلفة الوحدة: ${mix.unitCost} ريال / ${mix.unit}", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
+                                }
                             }
                         }
                         HorizontalDivider()
