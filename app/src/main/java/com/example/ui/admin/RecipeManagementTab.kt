@@ -3,6 +3,7 @@ package com.example.ui.admin
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -371,8 +372,7 @@ private fun RecipeEditorDialog(
                 }
 
                 LazyColumn(Modifier.heightIn(max = 340.dp)) {
-                    items(itemsState) { item ->
-                        val index = itemsState.indexOf(item)
+                    itemsIndexed(itemsState) { index, item ->
                         RecipeIngredientEditor(
                             item = item,
                             rawMaterials = rawMaterials,
@@ -529,8 +529,7 @@ private fun MixtureEditorDialog(
                 }
 
                 LazyColumn(Modifier.heightIn(max = 340.dp)) {
-                    items(itemsState) { item ->
-                        val index = itemsState.indexOf(item)
+                    itemsIndexed(itemsState) { index, item ->
                         MixtureIngredientEditor(
                             item = item,
                             rawMaterials = rawMaterials,
