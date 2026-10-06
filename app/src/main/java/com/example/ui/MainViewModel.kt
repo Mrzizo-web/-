@@ -1058,8 +1058,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
             DatabaseBackupManager.export(getApplication(), db, destination)
-                .onSuccess { snackbarMessage.value = "تم تصدير النسخة الاحتياطية بنجاح" }
-                .onFailure { snackbarMessage.value = "تعذر تصدير النسخة الاحتياطية: ${it.localizedMessage}" }
+                .onSuccess {
+                    db.auditLogDao().insertLog(
+                        AuditLogEntity(
+                            userId = user.id, userName = user.name, userRole = user.role.titleAr,
+                            action = "DATA_EXPORTED", entityType = "BACKUP", entityId = "DB",
+                            notes = "تصدير نسخة احتياطية كاملة"
+                        )
+                    )
+                    snackbarMessage.value = "تم تصدير النسخة الاحتياطية بنجاح"
+                }
+                .onFailure { snackbarMessage.value = "تعذر تصدير النسخة الاحتياطية: " + (it.localizedMessage ?: "خطأ غير متوقع") }
         }
     }
 
@@ -1076,9 +1085,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             DatabaseBackupManager.restore(getApplication(), source)
                 .onSuccess {
+                    db.auditLogDao().insertLog(
+                        AuditLogEntity(
+                            userId = user.id, userName = user.name, userRole = user.role.titleAr,
+                            action = "DATA_IMPORTED", entityType = "BACKUP", entityId = "DB",
+                            notes = "استعادة نسخة احتياطية كاملة بنجاح"
+                        )
+                    )
                     withContext(Dispatchers.Main) { onRestored() }
                 }
-                .onFailure { snackbarMessage.value = "تعذرت الاستعادة: ${it.localizedMessage}" }
+                .onFailure { snackbarMessage.value = "تعذرت الاستعادة: " + (it.localizedMessage ?: "خطأ غير متوقع") }
         }
     }
 
