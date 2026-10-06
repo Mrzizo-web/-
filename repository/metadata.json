@@ -1,0 +1,8 @@
+{
+  "name": "POWER FEUL POS",
+  "description": "نظام كاشير وإدارة كافتيريا متكامل لكافتيريا POWER FEUL بنادي Power Home Gym",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

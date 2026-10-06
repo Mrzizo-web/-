@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Keep the complete Room database, including POS sales and inventory records. -->
+    <include domain="database" path="power_feul_pos.db"/>
+    <!-- Recovery copies are local safeguards, not user backups. -->
+    <exclude domain="database" path="power_feul_pos.db.pre-restore"/>
+</full-backup-content>

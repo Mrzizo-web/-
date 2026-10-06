@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="database" path="power_feul_pos.db"/>
+        <exclude domain="database" path="power_feul_pos.db.pre-restore"/>
+    </cloud-backup>
+    <device-transfer>
+        <include domain="database" path="power_feul_pos.db"/>
+        <exclude domain="database" path="power_feul_pos.db.pre-restore"/>
+    </device-transfer>
+</data-extraction-rules>
