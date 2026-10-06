@@ -17,6 +17,7 @@ data class ExportSummary(
 )
 
 object DataExportEngine {
+    private val redactedColumns = setOf("pinHash", "pinSalt", "apiKey", "geminiApiKey")
     val allTables = listOf(
         "users", "categories", "raw_materials", "products", "recipes", "recipe_items",
         "mixtures", "mixture_items", "suppliers", "purchases", "purchase_items",
@@ -114,27 +115,32 @@ object DataExportEngine {
         endTime: Long?
     ): TableData {
         val quoted = quote(table)
-        val columns = mutableListOf<String>()
+        val allColumns = mutableListOf<String>()
         db.query("PRAGMA table_info(" + quoted + ")").use { cursor ->
             val nameIndex = cursor.getColumnIndex("name")
             while (cursor.moveToNext()) {
-                if (nameIndex >= 0) columns += cursor.getString(nameIndex)
+                if (nameIndex >= 0) allColumns += cursor.getString(nameIndex)
             }
         }
 
-        val dateColumn = columns.firstOrNull {
+        val visibleColumns = allColumns.filterNot { it in redactedColumns }
+        require(visibleColumns.isNotEmpty()) { "لا توجد أعمدة قابلة للتصدير في الجدول " + table }
+
+        val dateColumn = visibleColumns.firstOrNull {
             it == "createdAt" || it == "updatedAt" || it == "purchaseDate" ||
                 it == "date" || it == "timestamp" || it == "startTime" ||
                 it == "endTime" || it == "lastTransactionDate"
         }
 
+        val projection = visibleColumns.joinToString(",") { quote(it) }
         val sql: String
         val args: Array<String>?
         if (dateColumn != null && startTime != null && endTime != null) {
-            sql = "SELECT * FROM " + quoted + " WHERE " + quote(dateColumn) + " BETWEEN ? AND ?"
+            sql = "SELECT " + projection + " FROM " + quoted +
+                " WHERE " + quote(dateColumn) + " BETWEEN ? AND ?"
             args = arrayOf(startTime.toString(), endTime.toString())
         } else {
-            sql = "SELECT * FROM " + quoted
+            sql = "SELECT " + projection + " FROM " + quoted
             args = null
         }
 
@@ -146,7 +152,7 @@ object DataExportEngine {
                 }
             }
         }
-        return TableData(columns, rows)
+        return TableData(visibleColumns, rows)
     }
 
     private fun writeXlsxPackage(zip: ZipOutputStream, sheets: List<SheetData>) {
